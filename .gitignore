@@ -1,0 +1,14 @@
+# arquivos do modelo de ml e da plataforma jupyter notebook
+.ipynb_checkpoints/
+.jupyter/
+modelo/
+dados_philder/
+resultados/.ipynb_checkpoints/
+# Cache Python
+__pycache__/
+*.pyc
+
+# SO/IDE
+.DS_Store
+Thumbs.db
+.vscode/

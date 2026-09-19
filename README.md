@@ -1,0 +1,3 @@
+# Projeto de Replicação de Artigo Científico
+
+Este projeto implementa o modelo de detecção de phishing **[PHILDER: Lightweight Framework for Intelligent Phishing Detection on Resource-Limited Devices](https://ieeexplore.ieee.org/abstract/document/11095665/authors#authors)** (BISPO et al, 2025), como parte de atividade da disciplina de Aplicações DIstribuídas, do programa de Pós-Graduação em Engenharia Elétrica da Universidade de Brasília.
