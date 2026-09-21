@@ -37,6 +37,7 @@ from transformers import (
     AutoTokenizer,
     Trainer,
     TrainingArguments,
+    EarlyStoppingCallback
 )
 
 
@@ -151,11 +152,18 @@ def treinar_modelo(
     dataset_treino,
     dataset_teste,
     output_dir: str = "modelo/checkpoints",
-    num_train_epochs: int = 3,
+    # num_train_epochs: int = 3, --> utilizado como aprendizado inicial 
+    num_train_epochs: int = 10, # valor indicado utilizado no artigo
 ):
     """Configura `TrainingArguments`/`Trainer` e executa o fine-tuning do
     modelo sobre `dataset_treino`, avaliando a cada época em
     `dataset_teste`.
+
+     Ajustado para 10 épocas (fiel ao artigo) com proteções contra
+    overfitting: guarda o checkpoint de cada época, recarrega ao final o
+    de melhor F1 (não necessariamente o da última época) e para o treino
+    antecipadamente se o F1 de avaliação não melhorar por 2 épocas
+    seguidas.
 
     Retorna (trainer, tempo_treino_segundos).
     """
@@ -164,9 +172,16 @@ def treinar_modelo(
         num_train_epochs=num_train_epochs,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
+        ## Ajuste de configurações para mitigação de overfiting do treinamento
         eval_strategy="epoch",
-        save_strategy="no",
+        save_strategy="epoch",
+        save_total_limit=2,
+        load_best_model_at_end=True,
+        metric_for_best_model="f1",
+        greater_is_better=True,
+        weight_decay=0.01,
         logging_steps=10,
+        dataloader_pin_memory=False,
         report_to="none",
     )
 
@@ -176,6 +191,7 @@ def treinar_modelo(
         train_dataset=dataset_treino,
         eval_dataset=dataset_teste,
         compute_metrics=_metricas_durante_treino,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=2)], 
     )
 
     inicio = time.time()
