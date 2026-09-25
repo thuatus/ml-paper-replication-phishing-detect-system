@@ -281,14 +281,19 @@ def amostrar_quantidade_artigo(
             return list(lista)
         return rng.sample(lista, n_alvo)
 
-    legitimos_amostrados = _amostrar(emails_legitimos_brutos, n_legitimos, "legítimos")
+  #  legitimos_amostrados = _amostrar(emails_legitimos_brutos, n_legitimos, "legítimos")
 
     if deduplicar_antes:
         phishing_amostrados = _amostrar_sem_duplicatas(
             emails_phishing_brutos, n_phishing, random_state, nome="phishing"
         )
+
+        legitimos_amostrados = _amostrar_sem_duplicatas(
+            emails_legitimos_brutos, n_legitimos, random_state, nome="legítimos"
+        )
     else:
         phishing_amostrados = _amostrar(emails_phishing_brutos, n_phishing, "phishing")
+        legitimos_amostrados = _amostrar(emails_legitimos_brutos, n_legitimos, "legítimos")
 
     total = len(legitimos_amostrados) + len(phishing_amostrados)
     total_alvo = n_legitimos + n_phishing
