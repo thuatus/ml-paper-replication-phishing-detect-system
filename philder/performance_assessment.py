@@ -43,22 +43,41 @@ def calcular_metricas_primarias(y_true, predicoes) -> dict:
     }
 
 
+def calcular_tempo_avaliacao(log_history: list) -> float:
+    """Soma o tempo (s) gasto nas avaliações por época durante o treino,
+    a partir do `eval_runtime` que o `Trainer` registra em
+    `trainer.state.log_history` a cada avaliação.
+
+    Usado para separar o tempo de treino bruto (comparável ao artigo, que
+    também avalia por época — Figura 6) do tempo de treino líquido (só
+    otimização dos pesos).
+    """
+    return sum(r["eval_runtime"] for r in log_history if "eval_runtime" in r)
+
+
 def calcular_metricas_eficiencia(
     acuracia: float,
     tempo_treino: float,
     tempo_teste: float,
     n_amostras: int,
+    tempo_avaliacao: float = 0.0,
 ) -> dict:
     """Calcula as 3 métricas de eficiência do artigo:
     TES (Training Efficiency Score), IES (Inference Efficiency Score) e
     RTDE (Real-Time Detection Efficiency).
 
-    Retorna um dicionário com as três métricas.
+    `tempo_avaliacao` (opcional): tempo gasto nas avaliações por época
+    durante o treino (ver `calcular_tempo_avaliacao`). Quando informado,
+    também calcula `tempo_treino_liquido` e `TES_liquido`; o `TES`
+    principal continua usando o tempo bruto, para comparação com o artigo.
+
+    Retorna um dicionário com as métricas e os tempos usados.
     """
     tes = acuracia / tempo_treino #Accuracy / Training Time
     ies = acuracia / tempo_teste  #Accuracy /Testing Time
     rtde = acuracia / (tempo_teste / n_amostras) #Accuracy / Detection Time per Sample
     tempo_deteccao_amostra = (tempo_teste / n_amostras) * 1000
+    tempo_treino_liquido = tempo_treino - tempo_avaliacao
     return {
         "TES": tes,
         "IES": ies,
@@ -66,6 +85,9 @@ def calcular_metricas_eficiencia(
         "tempo_treino": tempo_treino,
         "tempo_teste": tempo_teste,
         "tempo_deteccao_amostra": tempo_deteccao_amostra,
+        "tempo_avaliacao_treino": tempo_avaliacao,
+        "tempo_treino_liquido": tempo_treino_liquido,
+        "TES_liquido": acuracia / tempo_treino_liquido,
     }
 
 

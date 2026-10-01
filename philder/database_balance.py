@@ -154,36 +154,65 @@ def treinar_modelo(
     output_dir: str = "modelo/checkpoints",
     # num_train_epochs: int = 3, --> utilizado como aprendizado inicial 
     num_train_epochs: int = 10, # valor indicado utilizado no artigo
+    protocolo: str = "artigo",
 ):
     """Configura `TrainingArguments`/`Trainer` e executa o fine-tuning do
-    modelo sobre `dataset_treino`, avaliando a cada época em
-    `dataset_teste`.
+    modelo sobre `dataset_treino`.
 
-     Ajustado para 10 épocas (fiel ao artigo) com proteções contra
-    overfitting: guarda o checkpoint de cada época, recarrega ao final o
-    de melhor F1 (não necessariamente o da última época) e para o treino
-    antecipadamente se o F1 de avaliação não melhorar por 2 épocas
-    seguidas.
+    `protocolo` controla se o conjunto de teste participa de alguma decisão
+    de treino (ver discussão do item 1 da Fase 3 — viés de seleção):
 
-    Retorna (trainer, tempo_treino_segundos).
+    - "artigo" (padrão, Fase 3): fiel ao PHILDER (Figura 6) — treina as
+      `num_train_epochs` épocas completas, sem early stopping e sem seleção
+      de checkpoint; o modelo final é o da última época. O teste é avaliado
+      a cada época **apenas para registrar a curva de perda**
+      (`eval_loss`), nenhuma decisão é tomada com base nele. Sem gravação
+      de checkpoints por época (`save_strategy="no"`), para não somar I/O
+      de disco ao tempo de treino — o modelo final é salvo por
+      `salvar_modelo`.
+    - "selecao" (Fase 2, lote 25/09(b)): early stopping (patience 2) e
+      recarga do checkpoint de melhor F1 — ambos decididos sobre o
+      conjunto de teste. Mantido só para reproduzir o resultado anterior e
+      medir o viés de seleção por comparação com o protocolo "artigo".
+
+    Hiperparâmetros não especificados pelo artigo (learning rate, batch
+    size, weight decay) seguem os valores já usados na Fase 2:
+    lr padrão do `Trainer` (5e-5), batch 8, weight_decay 0.01.
+
+    Retorna (trainer, tempo_treino_segundos). O tempo é medido em volta de
+    `trainer.train()` inteiro (inclui a avaliação por época); o tempo gasto
+    só na avaliação pode ser extraído depois com
+    `performance_assessment.calcular_tempo_avaliacao(trainer.state.log_history)`.
     """
-    args_treino = TrainingArguments(
+    if protocolo not in ("artigo", "selecao"):
+        raise ValueError(f"protocolo deve ser 'artigo' ou 'selecao', recebido: {protocolo!r}")
+
+    args_comuns = dict(
         output_dir=output_dir,
         num_train_epochs=num_train_epochs,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
-        ## Ajuste de configurações para mitigação de overfiting do treinamento
         eval_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        metric_for_best_model="f1",
-        greater_is_better=True,
         weight_decay=0.01,
         logging_steps=10,
         dataloader_pin_memory=False,
         report_to="none",
     )
+
+    if protocolo == "artigo":
+        args_treino = TrainingArguments(**args_comuns, save_strategy="no")
+        callbacks = []
+    else:
+        ## Ajuste de configurações para mitigação de overfiting do treinamento (Fase 2)
+        args_treino = TrainingArguments(
+            **args_comuns,
+            save_strategy="epoch",
+            save_total_limit=2,
+            load_best_model_at_end=True,
+            metric_for_best_model="f1",
+            greater_is_better=True,
+        )
+        callbacks = [EarlyStoppingCallback(early_stopping_patience=2)]
 
     trainer = Trainer(
         model=modelo,
@@ -191,13 +220,16 @@ def treinar_modelo(
         train_dataset=dataset_treino,
         eval_dataset=dataset_teste,
         compute_metrics=_metricas_durante_treino,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=2)], 
+        callbacks=callbacks,
     )
 
     inicio = time.time()
     trainer.train()
     tempo_treino = time.time() - inicio
-    print(f"Tempo de treino: {tempo_treino:.1f}s")
+    print(
+        f"Tempo de treino: {tempo_treino:.1f}s "
+        f"[protocolo={protocolo}, épocas executadas: {trainer.state.epoch:.0f}]"
+    )
 
     return trainer, tempo_treino
 

@@ -17,6 +17,7 @@
 | 24/09/2026 | Tentativa de estender a deduplicação prévia também ao lado dos legítimos (SpamAssassin) | A precisão volta a ficar suspeita (~1,0). Investigação revela dois bugs reais: (1) a célula do Módulo A no notebook nunca chamava `amostrar_quantidade_artigo` — usava código residual de 19/09 (`random.sample` sem deduplicação), tornando todas as edições do módulo `.py` entre 21/09–23/09 código morto; (2) ao corrigir isso e estender a deduplicação ao lado dos legítimos, uma troca de variáveis inverteu os rótulos de classe do dataset inteiro. Ambos os bugs corrigidos e validados por log de execução no mesmo dia |
 | 25/09/2026 (a) | 501 phishing deduplicado + 2.501 legítimos **sem** deduplicação prévia, 10 épocas + anti-overfitting, pipeline do notebook já corrigido (Bug 1 do Módulo A resolvido) | Primeiro lote realmente executado após a correção do código morto do Módulo A — ainda sem estender a deduplicação ao lado do SpamAssassin. Seis execuções repetidas (arquivos `resultado_final_25092026_estavel[1-6].csv`) |
 | 25/09/2026 (b) | 501 phishing + 2.446 legítimos (ambos deduplicados antes da amostragem), 10 épocas + anti-overfitting, pipeline do notebook verificado linha a linha | Extensão da deduplicação prévia também ao lado dos legítimos (após corrigir o Bug 2, de troca de variáveis). Seis execuções repetidas (arquivos `resultado_final_25092026-3_estavel[1-6].csv`) + checagem programática explícita de sobreposição treino/teste (`sobreposição = 0`) confirmam, pela primeira vez de forma direta, a ausência de vazamento. **Resultado de referência definitivo da replicação a partir desta data**, substituindo o de 23/09 |
+| 01/10/2026 | Mesmos dados de 25/09(b); **protocolo de treino fiel ao artigo** (`treinar_modelo(..., protocolo="artigo")`): 10 épocas fixas, sem early stopping e sem seleção de checkpoint pelo F1 do teste; avaliação por época mantida só para a curva de perda; sem gravação de checkpoints; tempo de avaliação por época registrado à parte (`tempo_treino_liquido`) | Remove o **viés de seleção de modelo no conjunto de teste** (o lote 25/09(b) usava o teste para decidir a parada e o checkpoint final). Seis execuções repetidas (arquivos `resultado_final-[1-6]_01102026.csv`, curvas `curva_perda-[1-6]_01102026.png`). Ver Seção 3.4 |
 
 ### 1.1 Nota sobre "n (teste)": não é uma contagem só de phishing
 
@@ -45,15 +46,19 @@ Por isso, a partir deste documento, **25/09(b) substitui 23/09 como resultado de
 
 | Modelo | Acc. | Prec. | Rec. | F1 | T. Treino (s) | T. Teste (s) | Tempo de Detecção (ms) |
 |---|---|---|---|---|---|---|---|
-| TinyBERT (2) | 0,9927 | 0,9896 | 0,9960 | 0,9927 | 111,83 | 4,48 | 14,8841 |
+| TinyBERT (2) | 0,9927 | 0,9896 | 0,9960 | 0,9927 | 180,52 | 6,22 | 12,9811 |
 
-### Tabela 2 — Métricas de Eficiência Computacional (valores brutos dos gráficos, não normalizados)
+> **Correção 01/10/2026:** até esta data, os tempos desta tabela traziam os valores da linha **DistilBERT (2)** da Tabela 3 do artigo (111,83 s / 4,48 s / 14,8841 ms). Substituídos pelos da linha **TinyBERT (2)** (180,52 s / 6,22 s / 12,9811 ms). As métricas preditivas já estavam corretas. A Tabela 4 do artigo reporta, para TinyBERT (undersampling), Acurácia 0,9927 ± 0,0006 e F1 0,9927 ± 0,0006 (3 execuções).
 
-| Métrica | Valor bruto |
-|---|---|
-| TES | 0,0389 |
-| IES | 1,0788 |
-| RTDE | 324,7750 |
+### Tabela 2 — Métricas de Eficiência Computacional (valores brutos, não normalizados)
+
+| Métrica | Fórmula bruta sobre a Tabela 3 do artigo | Valor exibido nas Figuras 3–5 do artigo |
+|---|---|---|
+| TES | 0,9927 / 180,52 = **0,0055** | 0,0389 |
+| IES | 0,9927 / 6,22 = **0,1596** | 1,0788 |
+| RTDE | 0,9927 / 0,0129811 = **76,47** | 324,7750 |
+
+> As Figuras 3–5 do artigo não são consistentes com os tempos da sua própria Tabela 3 (ex.: TES = 0,0389 implicaria ≈ 25,5 s de treino, valor ausente da Tabela 3). A partir de 01/10/2026, a comparação desta replicação usa a coluna da Tabela 3 (dados medidos). Outras inconsistências internas do artigo: o texto cita tempo de teste do TinyBERT com undersampling = 2,57 s (Tabela 3: 6,22 s) e "12.9811 s" por amostra (Tabela 3: ms).
 
 > Ver Seção 3.5 do Embasamento Teórico para a discrepância entre esses valores brutos e os valores normalizados/consolidados que o artigo reporta na sua própria Tabela 4 (0,80–0,93) — uma lacuna de reprodutibilidade do artigo original, não desta replicação.
 
@@ -151,6 +156,33 @@ duplicatas DENTRO de phishing: 0
 E-mails processados idênticos entre treino e teste: 0
 ```
 
+**01/10/2026 — protocolo fiel ao artigo: 10 épocas fixas, sem early stopping e sem seleção de checkpoint no teste (`resultado_final-[1-6]_01102026.csv`) — lote de 6 execuções**
+
+Mesmos dados de 25/09(b) (501 + 501 balanceados, dedup de phishing e ham, split estratificado 70/30, `random_state=42`). Única mudança: `treinar_modelo(..., protocolo="artigo")`. Todas as 6 execuções rodaram as 10 épocas completas (880 steps).
+
+| Execução | Acc. | Prec. | Rec. | F1 | T. Treino bruto (s) | T. Aval. por época (s) | T. Treino líquido (s) | T. Teste (s) | Detecção (ms) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 401,06 | 22,24 | 378,82 | 2,22 | 7,36 |
+| 2 | 0,9900 | 0,9868 | 0,9933 | 0,9900 | 396,51 | 22,09 | 374,41 | 2,24 | 7,44 |
+| 3 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 397,82 | 22,58 | 375,24 | 2,21 | 7,35 |
+| 4 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 412,32 | 23,94 | 388,38 | 2,26 | 7,49 |
+| 5 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 425,64 | 23,60 | 402,04 | 2,72 | 9,03 |
+| 6 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 405,07 | 23,00 | 382,07 | 2,43 | 8,07 |
+| **Média ± DP** | **0,9928 ± 0,0014** | **0,9922 ± 0,0027** | **0,9933 ± 0,0000** | **0,9928 ± 0,0013** | **406,40 ± 11,02** | **22,91 ± 0,74** | **383,49 ± 10,41** | **2,34 ± 0,20** | **7,79 ± 0,66** |
+
+Matrizes de confusão reconstruídas (n=301: 150 phishing + 151 legítimos):
+
+| Execução | VP | FN | FP | VN | Erros |
+|---|---|---|---|---|---|
+| 1 | 149 | 1 | 1 | 150 | 2 |
+| 2 | 149 | 1 | 2 | 149 | 3 |
+| 3 | 149 | 1 | 1 | 150 | 2 |
+| 4 | 149 | 1 | 1 | 150 | 2 |
+| 5 | 149 | 1 | 1 | 150 | 2 |
+| 6 | 149 | 1 | 1 | 150 | 2 |
+
+> Nota de arquivo: a execução 6 foi gravada com o nome padrão (`resultado_final.csv` / `curva_perda.png`) e deve ser renomeada para `resultado_final-6_01102026.csv` / `curva_perda-6_01102026.png`.
+
 ### 3.2 Tabela 2 — Métricas de Eficiência Computacional (valores brutos)
 
 **17/09/2026**
@@ -209,11 +241,25 @@ E-mails processados idênticos entre treino e teste: 0
 | IES | 0,255279 ± 0,018430 |
 | RTDE | 76,8516 ± 5,5475 |
 
+**01/10/2026 — protocolo fiel ao artigo — média ± DP das 6 execuções**
+
+| Execução | TES (bruto) | TES (líquido) | IES | RTDE |
+|---|---|---|---|---|
+| 1 | 0,002477 | 0,002622 | 0,4482 | 134,92 |
+| 2 | 0,002497 | 0,002644 | 0,4421 | 133,08 |
+| 3 | 0,002497 | 0,002647 | 0,4492 | 135,20 |
+| 4 | 0,002409 | 0,002558 | 0,4404 | 132,56 |
+| 5 | 0,002334 | 0,002471 | 0,3656 | 110,04 |
+| 6 | 0,002452 | 0,002600 | 0,4091 | 123,14 |
+| **Média ± DP** | **0,002444 ± 0,000063** | **0,002590 ± 0,000067** | **0,4258 ± 0,0330** | **128,16 ± 9,92** |
+
+TES (bruto) = Acurácia / tempo de `trainer.train()` inteiro (inclui a avaliação por época — comparável ao artigo, que também avalia por época, Figura 6). TES (líquido) = Acurácia / (tempo bruto − soma dos `eval_runtime` registrados em `trainer.state.log_history`).
+
 ### 3.3 Tabela consolidada — todas as execuções lado a lado
 
 | Data | Configuração | Acc. | Prec. | Rec. | F1 | T. Treino (s) | T. Teste (s) | Detecção (ms) | TES | IES | RTDE |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| — | Artigo (TinyBERT (2)) | 0,9927 | 0,9896 | 0,9960 | 0,9927 | 111,83 | 4,48 | 14,8841 | 0,0389 | 1,0788 | 324,7750 |
+| — | Artigo (TinyBERT (2), Tabela 3; eficiência pela fórmula bruta — corrigido em 01/10) | 0,9927 | 0,9896 | 0,9960 | 0,9927 | 180,52 | 6,22 | 12,9811 | 0,0055 | 0,1596 | 76,47 |
 | 17/09 | 1.501 amostras, 3 ép. | 0,9936 | 0,9957 | 0,9915 | 0,9936 | 370,75* | 6,74* | 7,18* | 0,00268 | 0,1474 | 138,3831 |
 | 19/09 | 501 amostras, 3 ép. | 0,9867 | 1,0000 | 0,9733 | 0,9865 | 255,8025 | 4,5329 | 15,0595 | 0,0039 | 0,2177 | 65,505 |
 | 21/09 | 501 amostras, 10 ép. + anti-overfitting | 0,9933 | 1,0000 | 0,9867 | 0,9933 | 205,5063 | 2,1591 | 7,1734 | 0,0048 | 0,4601 | 138,4772 |
@@ -221,8 +267,44 @@ E-mails processados idênticos entre treino e teste: 0
 | 23/09 | + dedup pré-consolidação desenhada (pipeline não confirmado) | 0,9900 | 0,9868 | 0,9933 | 0,9900 | 263,5980 | 2,3067 | 7,6633 | 0,00378 | 0,4292 | 129,1910 |
 | 25/09(a) | dedup apenas do phishing, pipeline corrigido (média de 6 exec.) | 0,9939 ± 0,0033 | 0,9989 ± 0,0027 | 0,9889 ± 0,0054 | 0,9939 ± 0,0033 | 198,06 ± 25,02 | 2,23 ± 0,16 | 7,40 ± 0,55 | 0,005088 ± 0,000664 | 0,447961 ± 0,032449 | 134,8363 ± 9,7670 |
 | 25/09(b) | + dedup também dos legítimos, pipeline verificado (**referência**, média de 6 exec.) | 0,9967 ± 0,0021 | 0,9978 ± 0,0034 | 0,9956 ± 0,0034 | 0,9967 ± 0,0021 | 352,24 ± 44,90 | 3,92 ± 0,29 | 13,03 ± 0,96 | 0,002872 ± 0,000406 | 0,255279 ± 0,018430 | 76,8516 ± 5,5475 |
+| 01/10 | mesmos dados de 25/09(b), **protocolo fiel ao artigo** (10 ép. fixas, sem seleção no teste) (média de 6 exec.) | 0,9928 ± 0,0014 | 0,9922 ± 0,0027 | 0,9933 ± 0,0000 | 0,9928 ± 0,0013 | 406,40 ± 11,02 | 2,34 ± 0,20 | 7,79 ± 0,66 | 0,002444 ± 0,000063 | 0,4258 ± 0,0330 | 128,16 ± 9,92 |
 
 \* T. Treino, T. Teste e Detecção de 17/09 não constavam na Tabela 1 original dessa data — foram derivados algebricamente a partir da Tabela 2 (TES, IES, RTDE) da mesma data, ex.: T. Treino = Acurácia ÷ TES = 0,9936 ÷ 0,00268 ≈ 370,75 s.
+
+### 3.4 Lote 01/10 — protocolo fiel ao artigo: comparação com 25/09(b) e com o artigo
+
+**Motivação.** No lote 25/09(b), o conjunto de teste era usado durante o treino para três decisões — avaliação por época, parada antecipada (`EarlyStoppingCallback`, paciência 2) e recarga do checkpoint de melhor F1 (`load_best_model_at_end`) — e depois para medir o resultado final. Isso é **vazamento por seleção de modelo**: nenhum e-mail do teste entra nos pesos, mas o teste influencia quais pesos são mantidos, inflando a métrica final (o máximo de várias medidas ruidosas é, em média, maior que o valor verdadeiro). É distinto do vazamento de dados de 21–25/09 e não é detectado pela checagem de sobreposição treino/teste. O artigo não descreve conjunto de validação separado nem seleção de checkpoint; sua Figura 6 mostra o treino completo de 10 épocas com acompanhamento da loss de avaliação — protocolo replicado em 01/10.
+
+**Comparação das métricas preditivas**
+
+| Métrica | Artigo (Tab. 3 / Tab. 4) | 01/10 — protocolo "artigo" (n=6) | 25/09(b) — seleção no teste (n=6) | Diferença 25/09(b) − 01/10 | Welch p | Mann-Whitney p |
+|---|---|---|---|---|---|---|
+| Acurácia | 0,9927 ± 0,0006 | **0,9928 ± 0,0014** | 0,9967 ± 0,0021 | +0,0039 | 0,005 | 0,009 |
+| Precisão | 0,9896 | **0,9922 ± 0,0027** | 0,9978 ± 0,0034 | +0,0055 | 0,012 | 0,009 |
+| Recall | 0,9960 | **0,9933 ± 0,0000** | 0,9956 ± 0,0034 | +0,0022 | 0,175 | 0,174 |
+| F1 | 0,9927 ± 0,0006 | **0,9928 ± 0,0013** | 0,9967 ± 0,0021 | +0,0039 | 0,005 | 0,010 |
+
+**Comparação de tempos e eficiência**
+
+| Métrica | Artigo (Tab. 3, fórmula bruta) | 01/10 (n=6) | 25/09(b) (n=6) |
+|---|---|---|---|
+| T. Treino bruto (s) | 180,52 | 406,40 ± 11,02 | 352,24 ± 44,90 |
+| T. Treino líquido (s) | — | 383,49 ± 10,41 | — |
+| T. Teste (s) | 6,22 | 2,34 ± 0,20 | 3,92 ± 0,29 |
+| Detecção (ms/amostra) | 12,9811 | 7,79 ± 0,66 | 13,03 ± 0,96 |
+| TES (bruto) | 0,0055 | 0,002444 ± 0,000063 | 0,002872 ± 0,000406 |
+| TES (líquido) | — | 0,002590 ± 0,000067 | — |
+| IES | 0,1596 | 0,4258 ± 0,0330 | 0,2553 ± 0,0184 |
+| RTDE | 76,47 | 128,16 ± 9,92 | 76,84 ± 5,55 |
+
+**Leitura**
+
+1. **Com o protocolo do artigo, a replicação empata com o artigo nas métricas preditivas** (Acurácia e F1 iguais até a 4ª casa decimal). A "vantagem" de 25/09(b) sobre o artigo (+0,40 p.p.) tem o mesmo tamanho do efeito do viés de seleção medido aqui (≈ 0,0039 ≈ 1,2 e-mail em 301), e desaparece quando o teste deixa de participar das decisões de treino.
+2. **As 6 execuções não são amostras independentes.** O recall tem desvio-padrão zero: 5 das 6 execuções erram exatamente os mesmos 2 e-mails (1 FP + 1 FN), e a execução 2 erra 1 FP a mais. As curvas de perda diferem entre execuções (não-determinismo do treino), mas o modelo final converge para as mesmas decisões, porque dados, split e semente do `Trainer` (42) são fixos. O ± mede só o não-determinismo de execução, não a incerteza do modelo — os p-valores acima devem ser lidos com essa ressalva (pseudo-replicação). Reforça a pendência de variar `random_state` (split) e `seed` (treino).
+3. **No protocolo antigo, a seleção no teste amplificava o ruído:** pequenas diferenças na trajetória mudavam a época escolhida, gerando variância maior (DP 0,0021 vs. 0,0014 na acurácia; resultado perfeito, 1,0000, na execução 2 de 25/09(b)). As curvas de 01/10 mostram o mecanismo — ex.: execução 4 com loss de avaliação ≈ 0,02 na época 3, ponto que o early stopping teria selecionado.
+4. **Os 2 e-mails errados por todas as execuções são casos estruturalmente difíceis** — candidatos a análise de erros (rótulo ambíguo ou phishing com aparência legítima).
+5. **Tempos.** Com épocas fixas, o tempo de treino fica estável (CV 2,7% vs. 12,7% em 25/09(b)) e o TES torna-se comparável entre execuções e entre modelos. A avaliação por época custa só ≈ 5,6% do treino, não explicando a diferença para o artigo. A diferença de tempo de **teste** entre os lotes (2,34 s vs. 3,92 s) não decorre do protocolo (a inferência é idêntica) — é variação de ambiente entre dias, já observada antes (25/09(a): 2,23 s); por isso, diferenças de IES/RTDE entre lotes não devem ser atribuídas a causas metodológicas. Dentro do próprio lote, as execuções 5 e 6 tiveram teste mais lento (2,72 s e 2,43 s), indicando máquina mais carregada.
+6. **Contra o artigo, o padrão de tempos não é compatível com "hardware mais fraco" apenas:** o treino desta replicação é ≈ 2,2× mais lento, mas a inferência é ≈ 2,7× mais rápida (IES e RTDE maiores que os do artigo). Hipótese a investigar: configuração não documentada no artigo — comprimento máximo da sequência (aqui 128), batch de inferência, ou inclusão da tokenização no tempo de teste.
 
 ---
 
@@ -247,6 +329,8 @@ E-mails processados idênticos entre treino e teste: 0
 ---
 
 ## 5. Comparação final: resultado de referência (25/09(b)) vs. artigo original
+
+> **Atualização 01/10/2026.** Esta seção foi escrita antes de duas correções: (1) os tempos e as métricas de eficiência do artigo usados abaixo vinham das Figuras 3–5 e de uma linha errada da Tabela 3 (ver Seção 2 — valores corrigidos: TES 0,0055, IES 0,1596, RTDE 76,47); (2) o lote 25/09(b) usa o conjunto de teste para seleção de modelo. A comparação atualizada, com o protocolo fiel ao artigo, está na Seção 3.4. A redefinição formal do resultado de referência fica pendente de decisão.
 
 | Métrica | Artigo (TinyBERT (2)) | Replicação (25/09(b), média de 6 exec.) | Diferença |
 |---|---|---|---|
