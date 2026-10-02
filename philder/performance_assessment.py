@@ -91,10 +91,18 @@ def calcular_metricas_eficiencia(
     }
 
 
-def gerar_curva_perda(log_history: list, caminho_imagem: str = "resultados/curva_perda.png"):
+def gerar_curva_perda(
+    log_history: list,
+    caminho_imagem: str = "resultados/curva_perda.png",
+    titulo: str = "Curva de perda — fine-tuning TinyBERT",
+):
     """Extrai os valores de `loss` (treino) e `eval_loss` (avaliação por
     época) registrados em `log_history` (`trainer.state.log_history`) e
     plota a curva de perda, salvando a imagem em `caminho_imagem`.
+
+    `titulo` (opcional, Fase 3): título do gráfico — permite identificar o
+    modelo treinado (TinyBERT, MiniLM, ...). O padrão mantém o título
+    original.
 
     Retorna o DataFrame com os pontos (step, loss) de treino usados no
     gráfico.
@@ -124,7 +132,7 @@ def gerar_curva_perda(log_history: list, caminho_imagem: str = "resultados/curva
         plt.plot(df_perda_avaliacao["step"], df_perda_avaliacao["eval_loss"], label="loss (avaliação)", marker="o")
     plt.xlabel("Passos de treino (step)")
     plt.ylabel("Loss")
-    plt.title("Curva de perda — fine-tuning TinyBERT")
+    plt.title(titulo)
     plt.legend()
     plt.tight_layout()
     plt.savefig(caminho_imagem)

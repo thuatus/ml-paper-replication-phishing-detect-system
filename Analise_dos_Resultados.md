@@ -18,6 +18,7 @@
 | 25/09/2026 (a) | 501 phishing deduplicado + 2.501 legítimos **sem** deduplicação prévia, 10 épocas + anti-overfitting, pipeline do notebook já corrigido (Bug 1 do Módulo A resolvido) | Primeiro lote realmente executado após a correção do código morto do Módulo A — ainda sem estender a deduplicação ao lado do SpamAssassin. Seis execuções repetidas (arquivos `resultado_final_25092026_estavel[1-6].csv`) |
 | 25/09/2026 (b) | 501 phishing + 2.446 legítimos (ambos deduplicados antes da amostragem), 10 épocas + anti-overfitting, pipeline do notebook verificado linha a linha | Extensão da deduplicação prévia também ao lado dos legítimos (após corrigir o Bug 2, de troca de variáveis). Seis execuções repetidas (arquivos `resultado_final_25092026-3_estavel[1-6].csv`) + checagem programática explícita de sobreposição treino/teste (`sobreposição = 0`) confirmam, pela primeira vez de forma direta, a ausência de vazamento. **Resultado de referência definitivo da replicação a partir desta data**, substituindo o de 23/09 |
 | 01/10/2026 | Mesmos dados de 25/09(b); **protocolo de treino fiel ao artigo** (`treinar_modelo(..., protocolo="artigo")`): 10 épocas fixas, sem early stopping e sem seleção de checkpoint pelo F1 do teste; avaliação por época mantida só para a curva de perda; sem gravação de checkpoints; tempo de avaliação por época registrado à parte (`tempo_treino_liquido`) | Remove o **viés de seleção de modelo no conjunto de teste** (o lote 25/09(b) usava o teste para decidir a parada e o checkpoint final). Seis execuções repetidas (arquivos `resultado_final-[1-6]_01102026.csv`, curvas `curva_perda-[1-6]_01102026.png`). Ver Seção 3.4 |
+| 02/10/2026 | Mesmos dados e protocolo "artigo" de 01/10; **modelo passado como parâmetro** e padrão de saída por modelo (`modelo/<modelo>/`, `resultados/<modelo>/`) | **Expansão para os 5 modelos do artigo** (TinyBERT, MiniLM, DistilBERT, MobileBERT, ALBERT) — rodada-piloto, 1 execução por modelo, para avaliar viabilidade, tempos e resultados. TinyBERT reexecutado com o código novo como validação. Ver Seção 7 |
 
 ### 1.1 Nota sobre "n (teste)": não é uma contagem só de phishing
 
@@ -356,3 +357,100 @@ Itens em aberto para próximas atualizações deste documento:
 - Repetir a execução de referência (25/09(b)) com sementes diferentes de `random_state` (todas as 6 execuções atuais usam a mesma semente/configuração, variando apenas por não-determinismo de treino), para isolar variância de semente de variância de treino.
 - Incorporar novos marcos à linha do tempo conforme forem executados.
 - A extensão da deduplicação prévia ao lado do SpamAssassin (item que estava em aberto neste documento até a atualização anterior) já foi implementada e validada como parte da correção de 24–25/09 — item concluído, com os dois lotes (a) e (b) documentando o antes/depois dessa extensão.
+
+---
+
+## 7. Expansão dos modelos avaliados (Fase 3 — piloto de 02/10/2026)
+
+### 7.1 Contexto da inclusão dos modelos
+
+O PHILDER não é apenas "TinyBERT com undersampling": a escolha do TinyBERT é a **conclusão de uma comparação** entre cinco variantes leves do BERT — DistilBERT, ALBERT, MiniLM, MobileBERT e TinyBERT (Tabela 2 do artigo) —, avaliadas em desempenho preditivo (Tabelas 3 e 4) e em eficiência computacional (TES, IES e RTDE, Figuras 3–5). A afirmação central do artigo é que o TinyBERT oferece o melhor equilíbrio entre acurácia e custo computacional. Replicar só o TinyBERT confirma o desempenho do modelo escolhido, mas **não testa essa afirmação**, que depende da comparação com os demais.
+
+Havia ainda um motivo específico: a Tabela 3 do artigo é internamente inconsistente com a sua própria conclusão. Pelos tempos ali registrados, MiniLM (103,52 s) e DistilBERT (111,83 s) treinam **mais rápido** que o TinyBERT (180,52 s) — o que daria a eles TES maior (0,0096 e 0,0089 contra 0,0055, pela fórmula bruta) —, apesar de o texto e a Figura 3 apontarem o TinyBERT como o mais eficiente em treino e de o TinyBERT ser a arquitetura menor. Só medindo os cinco modelos no mesmo ambiente e com o mesmo protocolo é possível verificar qual ordenação é a real.
+
+Objetivo desta etapa (piloto): **uma execução por modelo**, para (i) validar que o pipeline funciona com todas as arquiteturas, (ii) obter a ordem de grandeza dos tempos na máquina local (CPU) e planejar as rodadas completas, e (iii) obter uma primeira comparação com as Tabelas 3 e 4 do artigo.
+
+**Checkpoints adotados.** O artigo não informa quais checkpoints pré-treinados utilizou (a Tabela 2 descreve apenas as arquiteturas). Adotou-se, para cada modelo, o checkpoint de referência publicado com o artigo original da arquitetura (referências [24]–[28] da bibliografia):
+
+| Modelo | Checkpoint (Hugging Face) | Camadas × dimensão | Parâmetros (aprox.) | Tokenizador |
+|---|---|---|---|---|
+| TinyBERT | `huawei-noah/TinyBERT_General_4L_312D` | 4 × 312 | ~14,5 M | WordPiece (vocabulário BERT uncased) |
+| MiniLM | `microsoft/MiniLM-L12-H384-uncased` | 12 × 384 | ~33 M | WordPiece (vocabulário BERT uncased) |
+| DistilBERT | `distilbert-base-uncased` | 6 × 768 | ~66 M | WordPiece (vocabulário BERT uncased) |
+| MobileBERT | `google/mobilebert-uncased` | 24 camadas estreitas (gargalo 128) | ~25 M | WordPiece (vocabulário BERT uncased) |
+| ALBERT | `albert-base-v2` | 12 × 768 (camadas com pesos compartilhados) | ~12 M | **SentencePiece** (próprio) |
+
+> **Desvio documentado — tokenizador do ALBERT.** O artigo afirma ter usado "o tokenizador BERT padrão" (compatível com BERT-base-uncased). Para quatro dos cinco modelos isso coincide com o tokenizador próprio do checkpoint. O ALBERT, porém, usa vocabulário SentencePiece: alimentá-lo com IDs do vocabulário BERT não corresponderia às suas embeddings. Adotou-se o tokenizador próprio do ALBERT (carregado por `AutoTokenizer`), o que exige o pacote `sentencepiece` no ambiente.
+
+### 7.2 Ajuste do código
+
+O pipeline (Módulos A–D) e o protocolo de treino **não mudaram** — mesmos dados (amostragem, deduplicação, undersampling e split com `random_state=42`), protocolo "artigo" (10 épocas fixas, sem early stopping e sem seleção de checkpoint no teste) e mesmos hiperparâmetros para todos os modelos (lr 5e-5, batch 8, `weight_decay=0.01`, `max_length=128`). A mudança foi apenas na forma de **escolher o modelo e organizar as saídas**:
+
+- **Notebook — nova célula de configuração:** dicionário `modelos_artigo` (apelido → checkpoint), variável `modelo_escolhido` como único ponto de troca entre experimentos, pastas derivadas (`pasta_modelo`, `pasta_checkpoints`, `pasta_resultados`) e a função `proxima_rodada`, que numera automaticamente as execuções do dia (maior rodada existente + 1), eliminando a renomeação manual de arquivos.
+- **Notebook — células C e D:** o checkpoint passa a ser enviado a `carregar_tokenizer_e_modelo(checkpoint_modelo)`; o modelo vai para `modelo/<modelo>/` (checkpoints em `modelo/<modelo>/checkpoints/`) e os resultados para `resultados/<modelo>/resultado_final-<rodada>_<ddmmaaaa>.csv` e `curva_perda-<rodada>_<ddmmaaaa>.png`. O CSV ganhou as colunas de rastreabilidade `modelo`, `checkpoint` e `rodada`. A variável `modelo_tb` foi renomeada para `modelo_pre_treinado`.
+- **Módulo D (`performance_assessment.gerar_curva_perda`):** novo parâmetro opcional `titulo`, para identificar o modelo no gráfico (padrão mantém o título anterior).
+- **Procedimento de execução:** kernel reiniciado entre um modelo e outro (memória limpa e tempos mais comparáveis), com conferência no log dos números de controle do dataset (2.947 registros — 2.446 legítimos, 501 phishing; treino {1: 351, 0: 350}; teste {0: 151, 1: 150}).
+
+**Validação do código novo.** O TinyBERT foi reexecutado com o código parametrizado (02/10, rodada 1) e reproduziu exatamente o resultado do lote de 01/10: Acurácia 0,993355 (1 FP + 1 FN), idêntica a 5 das 6 execuções anteriores, com curva de perda equivalente. Isso confirma que a parametrização não alterou o pipeline e valida, por extensão, as execuções dos demais modelos.
+
+> **Registro de incidente operacional (01–02/10) — corrigido em 02/10.** Durante esta etapa, o notebook e o módulo `performance_assessment.py` voltaram, sem aviso, a versões anteriores, desfazendo alterações já aplicadas (o efeito visível foi um `TypeError` por parâmetro inexistente). A primeira hipótese registrada — abas antigas do Jupyter Lab salvando por cima — estava **errada**. A causa real foi o processo de gravação dos arquivos a partir da sessão do assistente (Claude): ao reaproveitar o mesmo caminho temporário de um envio anterior e enviar logo em seguida, o computador recebia a versão **anterior** daquele caminho (confirmado em 02/10: o arquivo gravado era idêntico, byte a byte, ao envio anterior, com horário de modificação igual ao da nova gravação). Correção adotada: caminho temporário único a cada envio e conferência de toda gravação por leitura do arquivo de volta (comparação de conteúdo). Notebook e módulo foram restaurados e conferidos. Lição para a reprodutibilidade: uma gravação "concluída sem erro" não prova que o conteúdo pretendido chegou ao destino — só a verificação direta do arquivo resultante prova (mesmo princípio da lição central do vazamento de dados, Seção 1.2), e cada estado validado deve ser versionado (commit no Git).
+
+### 7.3 Tabela consolidada de resultados (piloto — 1 execução por modelo)
+
+**Desempenho preditivo** (n = 301: 150 phishing + 151 legítimos)
+
+| Modelo | Acc. | Prec. | Rec. | F1 | FP | FN | Erros |
+|---|---|---|---|---|---|---|---|
+| TinyBERT (PHILDER) | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 2 |
+| MiniLM | 0,9867 | 0,9803 | 0,9933 | 0,9868 | 3 | 1 | 4 |
+| DistilBERT | **0,9967** | 0,9934 | **1,0000** | **0,9967** | 1 | 0 | **1** |
+| MobileBERT | 0,9900 | 0,9868 | 0,9933 | 0,9900 | 2 | 1 | 3 |
+| ALBERT | 0,9701 | 0,9732 | 0,9667 | 0,9699 | 4 | 5 | 9 |
+
+**Tempos e eficiência computacional** (CPU local; tempo de treino bruto inclui a avaliação por época)
+
+| Modelo | T. Treino bruto (s) | T. Aval. por época (s) | T. Treino líquido (s) | T. Teste (s) | Detecção (ms) | TES (bruto) | TES (líquido) | IES | RTDE |
+|---|---|---|---|---|---|---|---|---|---|
+| TinyBERT (PHILDER) | **382,19** | 21,52 | **360,67** | **2,15** | **7,14** | **0,002599** | **0,002754** | **0,4624** | **139,18** |
+| MiniLM | 1.430,11 | 92,07 | 1.338,05 | 9,01 | 29,95 | 0,000690 | 0,000737 | 0,1095 | 32,95 |
+| DistilBERT | 1.629,70 | 153,40 | 1.476,30 | 15,17 | 50,41 | 0,000612 | 0,000675 | 0,0657 | 19,77 |
+| MobileBERT | 1.382,11 | 103,63 | 1.278,47 | 10,24 | 34,02 | 0,000716 | 0,000774 | 0,0967 | 29,10 |
+| ALBERT | 2.929,51 | 362,99 | 2.566,52 | 35,91 | 119,30 | 0,000331 | 0,000378 | 0,0270 | 8,13 |
+
+> Para o TinyBERT, a tabela usa a execução de validação de 02/10 (mesmas condições dos demais modelos). Referência do lote completo de 01/10 (6 execuções): Acc. 0,9928 ± 0,0014; T. Treino 406,40 ± 11,02 s; T. Teste 2,34 ± 0,20 s; TES 0,002444 ± 0,000063; IES 0,4258 ± 0,0330; RTDE 128,16 ± 9,92.
+
+**Comparação com o artigo** (undersampling; Acc. e F1 da Tabela 4 — média ± DP de 3 execuções; demais valores da Tabela 3)
+
+| Modelo | Acc. artigo | Acc. replicação | Rec. artigo | Rec. replicação | T. Treino artigo (s) | T. Treino replicação (s) | T. Teste artigo (s) | T. Teste replicação (s) |
+|---|---|---|---|---|---|---|---|---|
+| TinyBERT (PHILDER) | 0,9927 ± 0,0006 | 0,9934 | 0,9960 | 0,9933 | 180,52 | 382,19 | 6,22 | 2,15 |
+| MiniLM | 0,9889 ± 0,0007 | 0,9867 | 0,9982 | 0,9933 | 103,52 | 1.430,11 | 6,21 | 9,01 |
+| DistilBERT | 0,9934 ± 0,0005 | 0,9967 | 1,0000 | 1,0000 | 111,83 | 1.629,70 | 4,48 | 15,17 |
+| MobileBERT | 0,9904 ± 0,0004 | 0,9900 | 0,9865 | 0,9933 | 219,45 | 1.382,11 | 9,76 | 10,24 |
+| ALBERT | 0,9834 ± 0,0008 | 0,9701 | 0,9864 | 0,9667 | 236,81 | 2.929,51 | 9,09 | 35,91 |
+
+**Custo relativo ao TinyBERT** (múltiplo do tempo do TinyBERT)
+
+| Modelo | Treino — artigo | Treino — replicação | Teste — artigo | Teste — replicação |
+|---|---|---|---|---|
+| MiniLM | 0,57× | 3,74× | 1,00× | 4,19× |
+| DistilBERT | 0,62× | 4,26× | 0,72× | 7,06× |
+| MobileBERT | 1,22× | 3,62× | 1,57× | 4,76× |
+| ALBERT | 1,31× | 7,67× | 1,46× | 16,70× |
+
+### 7.4 Achados do piloto
+
+1. **A ordenação de acurácia é idêntica à do artigo.** DistilBERT > TinyBERT > MobileBERT > MiniLM > ALBERT, tanto na Tabela 4 do artigo quanto nesta replicação — com dataset substituto, sem código dos autores e com hiperparâmetros não especificados no artigo. TinyBERT (0,9934 vs. 0,9927) e MobileBERT (0,9900 vs. 0,9904) ficam a menos de 1 e-mail do artigo; MiniLM a ~1 e-mail. O DistilBERT repete inclusive o recall 1,0000 do artigo. Ressalva: com n = 301, o erro-padrão da acurácia é ≈ ±0,5 p.p. (≈ 1,5 e-mail), de modo que diferenças de 1–2 e-mails entre modelos não são distinguíveis com uma execução.
+2. **A tese do PHILDER se confirma com mais força nas medições próprias do que no próprio artigo.** O TinyBERT é 3,6–7,7× mais rápido no treino e 4,2–16,7× mais rápido na inferência que os demais, e a ordem de custo acompanha o tamanho das arquiteturas. A diferença de acurácia em relação ao melhor modelo (DistilBERT) é de 1 e-mail, ao custo de 4,3× no treino e 7,1× na inferência — exatamente o trade-off que TES, IES e RTDE foram desenhados para expor.
+3. **A Tabela 3 do artigo não é compatível com o custo das arquiteturas.** No artigo, os tempos variam numa faixa estreita (≈ 0,6–1,3× no treino, 0,7–1,6× no teste, em relação ao TinyBERT) e a ordem se inverte em relação ao tamanho dos modelos (MiniLM e DistilBERT mais rápidos que o TinyBERT). **Hipótese (não confirmada):** medição em GPU, onde modelos pequenos não saturam o hardware e os tempos passam a ser dominados por custos fixos (transferência de dados, carregamento, sincronização), comprimindo e embaralhando as diferenças. Em CPU — cenário mais próximo de um dispositivo de borda, o alvo do PHILDER — o custo computacional domina e a vantagem do TinyBERT aparece integralmente. Se confirmada, a vantagem do PHILDER seria **maior** justamente no ambiente para o qual foi proposto.
+4. **MobileBERT — instabilidade inicial.** A loss de treino começa em ≈ 1,7 × 10⁶ e cai a ≈ 0 em menos de 20 passos; o modelo se recupera (acurácia alinhada ao artigo). Comportamento conhecido da arquitetura (camadas "NoNorm", sem LayerNorm, gerando logits muito grandes com a camada de classificação recém-inicializada), contido pelo gradient clipping padrão do `Trainer`. Consequência prática: a curva de perda em escala linear fica ilegível para este modelo.
+5. **ALBERT — platô inicial e menor convergência.** A loss permaneceu em ≈ 0,69 (= ln 2, equivalente a um classificador que chuta 50/50) nas primeiras ~4 épocas, só passando a aprender a partir da 5ª; ao final das 10 épocas a loss de avaliação (≈ 0,17) ainda era bem maior que a dos demais (≈ 0,03–0,09). Isso explica a acurácia mais baixa e o maior afastamento em relação ao artigo (0,9701 vs. 0,9834). O ALBERT é conhecido por exigir learning rate menor e warmup no fine-tuning; **os hiperparâmetros foram deliberadamente mantidos iguais para todos os modelos** — ajustá-los por modelo a partir do resultado no teste reintroduziria o viés de seleção eliminado em 01/10 (Seção 3.4). Registrado como limitação.
+6. **Custo de avaliação por época** varia de 5,6% (TinyBERT) a 12,4% (ALBERT) do tempo de treino bruto; o TES líquido não altera a ordenação dos modelos.
+
+### 7.5 Viabilidade e próximos passos
+
+- **Tempo de uma rodada completa (5 modelos):** ≈ 2h10 de treino (≈ 2,5 h com carregamento e teste). Como o TinyBERT já tem 6 execuções, completar os outros quatro modelos custa ≈ 2h20 por rodada adicional: ≈ 4h40 para chegar a 3 execuções por modelo (como o artigo) e ≈ 11h40 para 6.
+- **Pendente de decisão:** número de execuções por modelo na comparação final (3 ou 6).
+- Avaliar escala logarítmica (ou recorte dos passos iniciais) em `gerar_curva_perda`, para tornar legíveis curvas como a do MobileBERT.
+- Análise de erros: inspecionar os e-mails classificados incorretamente (em especial o phishing perdido por TinyBERT, MiniLM e MobileBERT e acertado pelo DistilBERT).
+- Os tempos dependem do estado da máquina (ex.: TinyBERT 382 s em 02/10 vs. 406 ± 11 s em 01/10, mesmo código): as rodadas finais devem ser executadas em condições controladas e equivalentes para todos os modelos.
