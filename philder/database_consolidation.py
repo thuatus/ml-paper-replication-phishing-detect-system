@@ -82,7 +82,12 @@ def importar_corpus_spamassassin(caminho_pasta: str) -> list[str]:
             tar.extractall(path=caminho_pasta)
         print(f"Extraído em: {caminho_pasta}")
 
-    arquivos_ham = glob.glob(os.path.join(pasta_extraida, "*"))
+    # 03/10/2026: ordenação explícita — glob.glob não garante ordem (alfabética no
+    # Windows/NTFS, arbitrária no Linux/Colab). Sem ela, as mesmas sementes geravam
+    # outro dataset fora do Windows (ver Analise_dos_Resultados.md, Seção 8.2).
+    # No Windows a ordem resultante é a mesma de antes: resultados locais inalterados.
+    ## arquivos_ham = glob.glob(os.path.join(pasta_extraida, "*"))
+    arquivos_ham = sorted(glob.glob(os.path.join(pasta_extraida, "*")))
     emails_brutos = []
     for caminho in arquivos_ham:
         if os.path.isfile(caminho):

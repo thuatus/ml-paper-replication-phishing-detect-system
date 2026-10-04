@@ -19,6 +19,7 @@
 | 25/09/2026 (b) | 501 phishing + 2.446 legítimos (ambos deduplicados antes da amostragem), 10 épocas + anti-overfitting, pipeline do notebook verificado linha a linha | Extensão da deduplicação prévia também ao lado dos legítimos (após corrigir o Bug 2, de troca de variáveis). Seis execuções repetidas (arquivos `resultado_final_25092026-3_estavel[1-6].csv`) + checagem programática explícita de sobreposição treino/teste (`sobreposição = 0`) confirmam, pela primeira vez de forma direta, a ausência de vazamento. **Resultado de referência definitivo da replicação a partir desta data**, substituindo o de 23/09 |
 | 01/10/2026 | Mesmos dados de 25/09(b); **protocolo de treino fiel ao artigo** (`treinar_modelo(..., protocolo="artigo")`): 10 épocas fixas, sem early stopping e sem seleção de checkpoint pelo F1 do teste; avaliação por época mantida só para a curva de perda; sem gravação de checkpoints; tempo de avaliação por época registrado à parte (`tempo_treino_liquido`) | Remove o **viés de seleção de modelo no conjunto de teste** (o lote 25/09(b) usava o teste para decidir a parada e o checkpoint final). Seis execuções repetidas (arquivos `resultado_final-[1-6]_01102026.csv`, curvas `curva_perda-[1-6]_01102026.png`). Ver Seção 3.4 |
 | 02/10/2026 | Mesmos dados e protocolo "artigo" de 01/10; **modelo passado como parâmetro** e padrão de saída por modelo (`modelo/<modelo>/`, `resultados/<modelo>/`) | **Expansão para os 5 modelos do artigo** (TinyBERT, MiniLM, DistilBERT, MobileBERT, ALBERT) — rodada-piloto, 1 execução por modelo, para avaliar viabilidade, tempos e resultados. TinyBERT reexecutado com o código novo como validação. Ver Seção 7 |
+| 03/10/2026 | Mesmo código, dados e protocolo; execução no **Google Colab** (CPU, 2 núcleos virtuais AMD EPYC 7B12, sem GPU; Linux) | **Reprodutibilidade entre ambientes.** Descoberta e correção de dependência da ordem de leitura dos arquivos do SpamAssassin (`glob` sem ordenação: alfabética no Windows, arbitrária no Linux), que gerava outro dataset com as mesmas sementes. Após a correção (`sorted(glob.glob(...))`, aplicada no Colab e, no mesmo dia, no código do PC local), seis execuções do TinyBERT reproduzem as métricas preditivas do PC local. Ver Seção 8 |
 
 ### 1.1 Nota sobre "n (teste)": não é uma contagem só de phishing
 
@@ -454,3 +455,82 @@ O pipeline (Módulos A–D) e o protocolo de treino **não mudaram** — mesmos 
 - Avaliar escala logarítmica (ou recorte dos passos iniciais) em `gerar_curva_perda`, para tornar legíveis curvas como a do MobileBERT.
 - Análise de erros: inspecionar os e-mails classificados incorretamente (em especial o phishing perdido por TinyBERT, MiniLM e MobileBERT e acertado pelo DistilBERT).
 - Os tempos dependem do estado da máquina (ex.: TinyBERT 382 s em 02/10 vs. 406 ± 11 s em 01/10, mesmo código): as rodadas finais devem ser executadas em condições controladas e equivalentes para todos os modelos.
+
+---
+
+## 8. Reprodutibilidade entre ambientes (Google Colab — 03/10/2026)
+
+### 8.1 Contexto
+
+Para permitir o trabalho remoto (sem o computador local), o mesmo notebook e o mesmo pacote `philder/` foram executados no **Google Colab**, a partir de uma cópia do projeto no Google Drive. O objetivo foi verificar se o pipeline produz os mesmos resultados num ambiente diferente — outro sistema operacional, outro processador e outras versões de bibliotecas — com o mesmo código, os mesmos dados de origem e as mesmas sementes.
+
+| | PC local | Google Colab |
+|---|---|---|
+| Sistema operacional | Windows | Linux |
+| Processador | CPU do notebook local | 2 núcleos virtuais AMD EPYC 7B12 (compartilhado), sem GPU |
+| Python | 3.12.13 | 3.13.15 |
+| torch | 2.14.0+cpu | 2.11.0+cpu |
+| transformers | 5.16.1 | 5.17.0 |
+
+### 8.2 Falha de reprodutibilidade identificada: ordem de leitura dos arquivos
+
+**Sintoma.** A primeira execução do TinyBERT no Colab obteve Acurácia 0,9767 (**7 erros**: 5 FP + 2 FN), contra 0,9934 (2 erros: 1 FP + 1 FN) no PC local — um salto grande demais para ser explicado por ruído numérico entre máquinas. As contagens de controle no log eram **idênticas** nos dois ambientes (2.947 registros — 2.446 legítimos, 501 phishing; treino {1: 351, 0: 350}; teste {0: 151, 1: 150}) e não indicavam nenhuma diferença.
+
+**Diagnóstico.** Foi calculada uma impressão digital (hash MD5) do **conteúdo** dos conjuntos — os textos de `body_processado`, ordenados e concatenados — nos dois ambientes, após o Módulo C:
+
+| Conjunto | PC local | Colab (antes da correção) |
+|---|---|---|
+| Balanceado | `c818699ea3118932f9a64f9dcc16169e` | `b10ef31410509e5ab6ec325452f6f811` |
+| Treino | `c7f1187377e71ac94aa2f100ee2d3e08` | `f9c9cc874ed13f19ac3ad186fa4a1ced` |
+| Teste | `243d7b22075cf4f6d88ecc63c04005ed` | `b6b8d650b77e7c78ddac5da4c945b6f9` |
+
+Os três conjuntos diferiam. A causa estava em `importar_corpus_spamassassin` (Módulo A), que lê os e-mails com `glob.glob(...)` **sem ordenação**: no Windows (NTFS) a lista vem em ordem alfabética (`00001…`, `00002…`, `00003…`); no Linux do Colab, em ordem arbitrária (`02159…`, `02058…`, `00737…`). Essa ordem se propaga pelo pipeline: (1) a deduplicação (`keep="first"`) escolhe outro representante entre duplicatas; (2) o DataFrame consolidado fica em outra ordem e o undersampling, com a mesma semente, sorteia **outros 501 legítimos**; (3) o split 70/30, com a mesma semente, gera **outro conjunto de teste**. O resultado de 0,9767 foi, portanto, medido sobre **outro dataset** e foi descartado.
+
+**Correção.** `arquivos_ham = sorted(glob.glob(os.path.join(pasta_extraida, "*")))`. Como o Windows já devolvia os arquivos em ordem alfabética, a ordenação reproduz exatamente a ordem sempre usada no PC local — **nenhum resultado local anterior é afetado** — e torna a leitura determinística em qualquer sistema. Após a correção, os hashes do Colab passaram a coincidir com os do PC local. *Situação em 03/10:* correção aplicada na cópia do Colab e, no mesmo dia, incorporada ao código do PC local (`philder/database_consolidation.py`, com comentário datado e a linha anterior preservada como comentário). Pendentes: commit/push para o repositório GitHub e verificação, no PC local, de que os três hashes permanecem iguais.
+
+**Lição para a reprodutibilidade.** Sementes fixas não garantem reprodutibilidade se a **ordem de entrada dos dados** depender do sistema operacional. Contagens idênticas não provam conteúdo idêntico — só a verificação direta do conteúdo (impressão digital) revelou a diferença. É o mesmo princípio das lições anteriores do projeto (vazamento de dados, Seção 1.2; verificação de gravação, Seção 7.2).
+
+### 8.3 Resultados no Colab após a correção (TinyBERT, 6 execuções)
+
+| Execução | Acc. | Prec. | Rec. | F1 | FP | FN | T. Treino bruto (s) | T. Aval. por época (s) | T. Teste (s) | Detecção (ms) | TES | IES | RTDE |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 630,78 | 62,55 | 6,54 | 21,74 | 0,001575 | 0,1518 | 45,70 |
+| 2 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 665,95 | 65,02 | 6,05 | 20,11 | 0,001492 | 0,1641 | 49,41 |
+| 3 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 640,24 | 63,59 | 6,69 | 22,22 | 0,001552 | 0,1485 | 44,70 |
+| 4 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 640,13 | 62,56 | 6,03 | 20,04 | 0,001552 | 0,1646 | 49,56 |
+| 5 | 0,9900 | 0,9933 | 0,9867 | 0,9900 | 1 | 2 | 628,57 | 61,18 | 5,64 | 18,74 | 0,001575 | 0,1755 | 52,84 |
+| 6 | 0,9934 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 630,86 | 61,50 | 6,23 | 20,70 | 0,001575 | 0,1594 | 47,98 |
+| **Média ± DP** | **0,9928 ± 0,0014** | **0,9933 ± 0,0000** | **0,9922 ± 0,0027** | **0,9928 ± 0,0014** | — | — | **639,42 ± 13,93** | **62,73 ± 1,41** | **6,20 ± 0,38** | **20,59 ± 1,26** | **0,001553 ± 0,000032** | **0,1607 ± 0,0098** | **48,36 ± 2,94** |
+
+T. Treino líquido: 576,69 ± 12,65 s; TES (líquido): 0,001722 ± 0,000036.
+
+### 8.4 Comparação entre ambientes
+
+| | Colab, 03/10 (n=6) | PC local, 01/10 (n=6) | Artigo — TinyBERT (2) |
+|---|---|---|---|
+| Acurácia | **0,9928 ± 0,0014** | **0,9928 ± 0,0014** | 0,9927 ± 0,0006 |
+| Precisão | 0,9933 ± 0,0000 | 0,9922 ± 0,0027 | 0,9896 |
+| Recall | 0,9922 ± 0,0027 | 0,9933 ± 0,0000 | 0,9960 |
+| F1 | 0,9928 ± 0,0014 | 0,9928 ± 0,0013 | 0,9927 ± 0,0006 |
+| Execuções com 2 erros (1 FP + 1 FN) | 5 de 6 | 5 de 6 | — |
+| Execução com 3 erros | 1 (+1 FN) | 1 (+1 FP) | — |
+| T. Treino bruto (s) | 639,42 ± 13,93 | 406,40 ± 11,02 | 180,52 |
+| Avaliação por época (% do treino) | 9,8% | 5,6% | — |
+| T. Teste (s) | 6,20 ± 0,38 | 2,34 ± 0,20 | 6,22 |
+| Detecção (ms) | 20,59 ± 1,26 | 7,79 ± 0,66 | 12,98 |
+| TES | 0,001553 ± 0,000032 | 0,002444 ± 0,000063 | 0,0055 |
+| IES | 0,1607 ± 0,0098 | 0,4258 ± 0,0330 | 0,1596 |
+| RTDE | 48,36 ± 2,94 | 128,16 ± 9,92 | 76,47 |
+
+### 8.5 Leitura
+
+1. **O desempenho preditivo se reproduz entre ambientes.** Com outro sistema operacional, outro processador e outras versões de Python, torch e transformers, Acurácia e F1 têm média e desvio-padrão iguais até a 4ª casa decimal, e o mesmo padrão de erros se repete (5 de 6 execuções com exatamente 1 FP + 1 FN). A única diferença é a execução fora do padrão (um FN a mais no Colab, um FP a mais no PC local) — variação do tamanho de um e-mail na fronteira de decisão. Isso reforça a confiabilidade do resultado da replicação.
+2. **A diferença inicial vinha inteiramente dos dados, não do ambiente.** Antes da correção da ordem de leitura, o mesmo código no Colab produziu 7 erros; depois dela, 2.
+3. **Os tempos escalam com o hardware, e de forma desigual entre as métricas.** No Colab (2 núcleos virtuais compartilhados), o treino foi ≈ 1,6× mais lento e o teste ≈ 2,6× mais lento que no PC local; a inferência em lote perde mais com poucos núcleos. A avaliação por época também pesa mais (9,8% vs. 5,6% do treino). Consequência: **as métricas de eficiência não são transportáveis entre ambientes por proporção simples** — TES, IES e RTDE só são comparáveis quando medidos no mesmo hardware, e o hardware precisa ser reportado junto com elas.
+4. **Coincidência a ser lida com cautela.** O tempo de teste e o IES do Colab (6,20 s; 0,161) ficaram quase iguais aos do artigo (6,22 s; 0,160), enquanto o treino do artigo (180,52 s) é ≈ 3,5× mais rápido que o do Colab. Esses valores não se encaixam num único hardware conhecido, o que reforça que a Tabela 3 do artigo não admite explicação simples (Seção 7.4); nada se pode concluir sobre o hardware dos autores a partir disso.
+
+### 8.6 Pendências
+
+- ~~Incorporar `sorted(glob.glob(...))` ao código do PC local~~ (feito em 03/10). Falta: commit/push para o GitHub e verificar no PC local que os três hashes permanecem iguais (`c818699e…`, `c7f11873…`, `243d7b22…`).
+- Registrar, em toda execução fora do PC local, o hardware e as versões de Python/torch/transformers junto com os resultados (resultados do Colab mantidos separados dos do PC local).
+- Avaliar fixar as versões das bibliotecas (`requirements.txt`) no pacote de reprodutibilidade.
