@@ -20,6 +20,7 @@
 | 01/10/2026 | Mesmos dados de 25/09(b); **protocolo de treino fiel ao artigo** (`treinar_modelo(..., protocolo="artigo")`): 10 épocas fixas, sem early stopping e sem seleção de checkpoint pelo F1 do teste; avaliação por época mantida só para a curva de perda; sem gravação de checkpoints; tempo de avaliação por época registrado à parte (`tempo_treino_liquido`) | Remove o **viés de seleção de modelo no conjunto de teste** (o lote 25/09(b) usava o teste para decidir a parada e o checkpoint final). Seis execuções repetidas (arquivos `resultado_final-[1-6]_01102026.csv`, curvas `curva_perda-[1-6]_01102026.png`). Ver Seção 3.4 |
 | 02/10/2026 | Mesmos dados e protocolo "artigo" de 01/10; **modelo passado como parâmetro** e padrão de saída por modelo (`modelo/<modelo>/`, `resultados/<modelo>/`) | **Expansão para os 5 modelos do artigo** (TinyBERT, MiniLM, DistilBERT, MobileBERT, ALBERT) — rodada-piloto, 1 execução por modelo, para avaliar viabilidade, tempos e resultados. TinyBERT reexecutado com o código novo como validação. Ver Seção 7 |
 | 03/10/2026 | Mesmo código, dados e protocolo; execução no **Google Colab** (CPU, 2 núcleos virtuais AMD EPYC 7B12, sem GPU; Linux) | **Reprodutibilidade entre ambientes.** Descoberta e correção de dependência da ordem de leitura dos arquivos do SpamAssassin (`glob` sem ordenação: alfabética no Windows, arbitrária no Linux), que gerava outro dataset com as mesmas sementes. Após a correção (`sorted(glob.glob(...))`, aplicada no Colab e, no mesmo dia, no código do PC local), seis execuções do TinyBERT reproduzem as métricas preditivas do PC local. Ver Seção 8 |
+| 03–04/10/2026 | Google Colab (mesmo ambiente da Seção 8), 1 execução de cada um dos 5 modelos | **Expansão no Colab**: 4 dos 5 modelos repetem exatamente a acurácia do piloto local; o ALBERT passa de 9 para 3 erros — evidência de **instabilidade de fine-tuning** (platô inicial em ln 2 no PC, ausente no Colab). Na CPU de 2 núcleos, a vantagem de tempo do TinyBERT cresce (até 18× no treino e 23× na inferência). Ver Seções 8.7–8.9 |
 
 ### 1.1 Nota sobre "n (teste)": não é uma contagem só de phishing
 
@@ -534,3 +535,72 @@ T. Treino líquido: 576,69 ± 12,65 s; TES (líquido): 0,001722 ± 0,000036.
 - ~~Incorporar `sorted(glob.glob(...))` ao código do PC local~~ (feito em 03/10). Falta: commit/push para o GitHub e verificar no PC local que os três hashes permanecem iguais (`c818699e…`, `c7f11873…`, `243d7b22…`).
 - Registrar, em toda execução fora do PC local, o hardware e as versões de Python/torch/transformers junto com os resultados (resultados do Colab mantidos separados dos do PC local).
 - Avaliar fixar as versões das bibliotecas (`requirements.txt`) no pacote de reprodutibilidade.
+
+### 8.7 Expansão no Colab: os 5 modelos (1 execução por modelo, 03–04/10/2026)
+
+Mesmo ambiente da Seção 8.1 (Colab, CPU com 2 núcleos virtuais, sem GPU), mesmo código (com a ordenação da Seção 8.2), dados e protocolo. Uma execução por modelo (TinyBERT: execução 6 de 03/10; MiniLM: execução 2 de 03/10; demais: 04/10).
+
+**Métricas preditivas — Colab vs. PC local (piloto de 02/10, Seção 7.3)**
+
+| Modelo | Acc. Colab | Erros Colab (FP + FN) | Acc. PC local | Erros PC local (FP + FN) | Acc. artigo (Tab. 4) |
+|---|---|---|---|---|---|
+| TinyBERT (PHILDER) | 0,9934 | 2 (1 + 1) | 0,9934 | 2 (1 + 1) | 0,9927 ± 0,0006 |
+| MiniLM | 0,9867 | 4 (2 + 2) | 0,9867 | 4 (3 + 1) | 0,9889 ± 0,0007 |
+| DistilBERT | **0,9967** | 1 (1 + 0) | **0,9967** | 1 (1 + 0) | 0,9934 ± 0,0005 |
+| MobileBERT | 0,9900 | 3 (1 + 2) | 0,9900 | 3 (2 + 1) | 0,9904 ± 0,0004 |
+| ALBERT | **0,9900** | **3 (1 + 2)** | **0,9701** | **9 (4 + 5)** | 0,9834 ± 0,0008 |
+
+Precisão / Recall / F1 no Colab: TinyBERT 0,9933 / 0,9933 / 0,9933; MiniLM 0,9867 / 0,9867 / 0,9867; DistilBERT 0,9934 / 1,0000 / 0,9967; MobileBERT 0,9933 / 0,9867 / 0,9900; ALBERT 0,9933 / 0,9867 / 0,9900.
+
+**Tempos e eficiência computacional no Colab**
+
+| Modelo | T. Treino bruto (s) | Aval. por época (% do treino) | T. Teste (s) | Detecção (ms) | TES | IES | RTDE | Treino × TinyBERT | Teste × TinyBERT |
+|---|---|---|---|---|---|---|---|---|---|
+| TinyBERT (PHILDER) | **630,86** | 9,7% | **6,23** | **20,70** | **0,001575** | **0,1594** | **47,98** | 1,0× | 1,0× |
+| MiniLM | 2.244,40 | 10,4% | 23,16 | 76,94 | 0,000440 | 0,0426 | 12,82 | 3,6× | 3,7× |
+| DistilBERT | 5.718,36 | 11,3% | 63,67 | 211,53 | 0,000174 | 0,0157 | 4,71 | 9,1× | 10,2× |
+| MobileBERT | 3.716,17 | 11,2% | 39,67 | 131,79 | 0,000266 | 0,0250 | 7,51 | 5,9× | 6,4× |
+| ALBERT | 11.391,16 (≈ 3h10) | 12,6% | 144,86 | 481,26 | 0,000087 | 0,0068 | 2,06 | 18,1× | 23,3× |
+
+**Leitura.** Quatro dos cinco modelos repetem exatamente a acurácia e o número de erros do PC local (DistilBERT e TinyBERT com os mesmos tipos de erro; MiniLM e MobileBERT com troca de um FP por um FN — ruído de fronteira). É mais uma confirmação de que os dados são idênticos nos dois ambientes (Seção 8.2). A ordem de acurácia no Colab — DistilBERT > TinyBERT > MobileBERT = ALBERT > MiniLM — difere da do artigo e do PC local apenas na posição do ALBERT (Seção 8.8). Viabilidade: uma rodada completa dos 5 modelos levou ≈ 6,5 h no Colab (ALBERT sozinho > 3 h), o que torna arriscado rodar lotes completos na versão gratuita (sessão máxima e desconexão por inatividade).
+
+### 8.8 Instabilidade de fine-tuning do ALBERT
+
+Com os mesmos dados, código e hiperparâmetros, o ALBERT obteve 9 erros no PC local e 3 no Colab — a única diferença relevante entre os ambientes em todo o experimento. As curvas de perda explicam:
+
+| | ALBERT — PC local (02/10) | ALBERT — Colab (04/10) |
+|---|---|---|
+| Primeiras épocas | loss de treino parada em ≈ 0,69 (= ln 2, equivalente a classificar ao acaso) por ~4 épocas; loss de avaliação **subindo** até ≈ 0,71 | loss de treino cai de ≈ 0,6 para ≈ 0,05 já na 1ª época; loss de avaliação começa em ≈ 0,14 |
+| Início efetivo do aprendizado | 5ª época | 1ª época |
+| Loss de avaliação final | ≈ 0,17 | ≈ 0,08 |
+| Resultado | 0,9701 (9 erros) | 0,9900 (3 erros) |
+
+Mesmo no Colab, a loss de treino apresentou picos fortes ao longo do treino (≈ 0,56 perto do passo 130; ≈ 0,33 perto do passo 440), bem maiores que os dos demais modelos.
+
+**Interpretação.** O fine-tuning do ALBERT com os hiperparâmetros adotados (lr 5e-5, sem warmup) comporta-se de forma quase binária: o modelo fica ou não preso num platô inicial, e pequenas diferenças numéricas entre ambientes (processador, versões de bibliotecas) decidem o desfecho — com efeito de ≈ 6 e-mails (≈ 2 p.p. de acurácia) no resultado final. Consequências:
+
+1. **Uma execução não representa o ALBERT.** O resultado tende a ser bimodal; nas rodadas múltiplas, deve-se registrar quantas execuções ficaram "presas" no platô, além da média (a média de dois regimes distintos esconde o fenômeno).
+2. **Lacuna do artigo.** O artigo reporta 0,9834 ± 0,0008 para o ALBERT. Uma variação tão pequena não é compatível com a instabilidade observada: ou as três execuções dos autores coincidiram no mesmo regime, ou usaram algum recurso de estabilização não descrito (warmup, learning rate menor), ou as execuções não variaram entre si (mesma ressalva já feita ao ± do artigo, Seção 3.4).
+3. **Os hiperparâmetros continuam iguais para todos os modelos.** "Corrigir" o ALBERT ajustando hiperparâmetros a partir do resultado no teste reintroduziria o viés de seleção eliminado em 01/10 (Seção 3.4). A instabilidade é reportada como característica do modelo nessas condições.
+
+### 8.9 Efeito do hardware na vantagem do TinyBERT
+
+Lentidão do Colab (2 núcleos virtuais compartilhados) em relação ao PC local, por modelo:
+
+| Modelo | Dimensão interna | Treino (Colab ÷ PC) | Teste (Colab ÷ PC) |
+|---|---|---|---|
+| TinyBERT | 312 | 1,65× | 2,90× |
+| MiniLM | 384 | 1,57× | 2,57× |
+| MobileBERT | 128 (gargalo) / 512 | 2,69× | 3,87× |
+| DistilBERT | 768 | 3,51× | 4,20× |
+| ALBERT | 768 | 3,89× | 4,03× |
+
+Os modelos com dimensão interna 768 foram os mais penalizados pela máquina mais fraca. **Hipótese (não verificada):** as matrizes dos modelos menores cabem melhor na memória cache do processador, enquanto as dos maiores dependem mais da memória principal — gargalo típico de uma máquina virtual compartilhada.
+
+Consequência: a vantagem de tempo do TinyBERT sobre os demais modelos passa de 3,6–7,7× no treino e 4,2–16,7× na inferência (PC local, Seção 7.4) para **3,6–18,1× no treino e 3,7–23,3× na inferência** (Colab). **Quanto mais limitado o hardware, maior a vantagem do PHILDER** — evidência, em dois ambientes de CPU, a favor da tese do artigo para dispositivos com recursos limitados, e coerente com a hipótese levantada para a Tabela 3 (Seção 7.4): em hardware potente (GPU), as diferenças entre os modelos tenderiam a encolher.
+
+### 8.10 Pendências adicionais
+
+- Nas rodadas múltiplas finais, registrar para o ALBERT (e para os demais modelos) se houve platô inicial, a partir da curva de perda de cada execução.
+- Avaliar, como experimento complementar e explicitamente separado do protocolo principal, o efeito de warmup/learning rate menor sobre a estabilidade do ALBERT — sem usar o resultado no teste para escolher a configuração do protocolo principal.
+- Experimento GPU vs. CPU (Colab/Kaggle com GPU) para testar a hipótese de compressão das diferenças de tempo em hardware potente.
