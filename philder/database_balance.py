@@ -45,23 +45,41 @@ def aplicar_undersampling(
     df: pd.DataFrame,
     coluna_rotulo: str = "class_label",
     random_state: int = 42,
+    n_por_classe: dict | None = None,
 ) -> pd.DataFrame:
-    """Reduz a classe majoritária de `df` até igualar a minoritária, por
-    escolha randômica das mensagens mantidas (undersampling).
+    """Reduz as classes de `df` por escolha randômica das mensagens mantidas
+    (undersampling).
+
+    `n_por_classe` (opcional, Fase 3 — 07/10/2026): quantidade-alvo por
+    classe, ex. `{0: 502, 1: 501}` — configuração do artigo PHILDER ("we
+    randomly selected 502 legitimate emails while retaining the 501
+    spam/phishing emails", Figura 2: 1.003 registros). Se `None` (padrão),
+    mantém o comportamento original: todas as classes reduzidas ao tamanho
+    da classe minoritária (501 + 501 = 1.002).
 
     Retorna um DataFrame balanceado.
     """
     contagem = df[coluna_rotulo].value_counts()
-    qtd_minoritaria = contagem.min()
+    if n_por_classe is None:
+        alvo = {classe: contagem.min() for classe in contagem.index}
+    else:
+        alvo = dict(n_por_classe)
+        faltantes = set(contagem.index) - set(alvo)
+        if faltantes:
+            raise ValueError(f"n_por_classe sem alvo para a(s) classe(s) {sorted(faltantes)}")
+        excedentes = {c: (n, int(contagem[c])) for c, n in alvo.items() if n > contagem.get(c, 0)}
+        if excedentes:
+            raise ValueError(f"Alvo maior que o disponível (classe: (alvo, disponível)): {excedentes}")
 
     partes_balanceadas = [
-        df[df[coluna_rotulo] == classe].sample(n=qtd_minoritaria, random_state=random_state)
+        df[df[coluna_rotulo] == classe].sample(n=alvo[classe], random_state=random_state)
         for classe in contagem.index
     ]
 
     df_balanceado = pd.concat(partes_balanceadas).sample(frac=1, random_state=random_state).reset_index(drop=True)
 
-    print(f"Balanceamento aplicado: {df_balanceado[coluna_rotulo].value_counts().to_dict()}")
+    print(f"Balanceamento aplicado: {df_balanceado[coluna_rotulo].value_counts().to_dict()} "
+          f"(n_por_classe={'mínimo das classes' if n_por_classe is None else n_por_classe})")
     return df_balanceado
 
 

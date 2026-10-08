@@ -18,6 +18,8 @@ Uso (a partir da pasta raiz do projeto, onde estão `philder/` e `dados_philder/
     python rodar_lote.py --modelos tinybert minilm --rodadas 3
     python rodar_lote.py --modelos todos --rodadas 1
     python rodar_lote.py --modelos todos --rodadas 3 --simular   # só mostra o plano
+    python rodar_lote.py --modelos todos --rodadas 6 --undersampling artigo        # 502 + 501 (padrão)
+    python rodar_lote.py --modelos tinybert --rodadas 1 --undersampling minoritaria # 501 + 501
 
 No Colab/Kaggle (célula):  !python rodar_lote.py --modelos todos --rodadas 1
 
@@ -54,6 +56,19 @@ MODELOS_ARTIGO = {
     "mobilebert": "google/mobilebert-uncased",
     "albert":     "albert-base-v2",
 }
+
+# Alvo do undersampling por classe (0 = legítimo, 1 = phishing) — 07/10/2026.
+# "artigo": 502 legítimos + 501 phishing = 1.003 (Figura 2 do PHILDER).
+# "minoritaria": todas as classes no tamanho da minoritária (501 + 501 = 1.002, comportamento até 07/10).
+UNDERSAMPLING_PREDEFINIDOS = {"artigo": {0: 502, 1: 501}, "minoritaria": None}
+
+
+def _interpretar_undersampling(valor: str):
+    """'artigo' | 'minoritaria' | 'L,P' (ex.: '502,501') -> dict ou None."""
+    if valor in UNDERSAMPLING_PREDEFINIDOS:
+        return UNDERSAMPLING_PREDEFINIDOS[valor]
+    legitimos, phishing = (int(x) for x in valor.split(","))
+    return {0: legitimos, 1: phishing}
 
 
 def proxima_rodada(pasta: str, data: str) -> int:
@@ -105,7 +120,7 @@ def _ambiente() -> dict:
 # ---------------------------------------------------------------------------
 # Trabalhador: UM treinamento completo (Módulos A–D), em processo próprio
 # ---------------------------------------------------------------------------
-def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str) -> None:
+def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str, undersampling: str) -> None:
     """Reproduz a sequência de chamadas das células A, B, C e D do notebook."""
     from philder import infra
     from philder import database_consolidation as consolidacao
@@ -133,7 +148,8 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str)
     df = processamento.pipeline_processamento(df)
 
     # --- Módulo C: balanceamento + treino + teste ---
-    df_balanceado = balanceamento.aplicar_undersampling(df)
+    undersampling_alvo = _interpretar_undersampling(undersampling)
+    df_balanceado = balanceamento.aplicar_undersampling(df, n_por_classe=undersampling_alvo)
     df_treino, df_teste = balanceamento.dividir_treino_teste(df_balanceado)
     impressoes = {
         "hash_balanceado": _impressao(df_balanceado),
@@ -163,7 +179,11 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str)
     )
     avaliacao.salvar_resultados(
         {"modelo": modelo_escolhido, "checkpoint": checkpoint_modelo, "rodada": rodada,
-         **metricas, **eficiencia, **_ambiente(), **impressoes},
+         **metricas, **eficiencia, **_ambiente(), **impressoes,
+         "undersampling": undersampling,
+         "n_balanceado_legitimos": int((df_balanceado["class_label"] == 0).sum()),
+         "n_balanceado_phishing": int((df_balanceado["class_label"] == 1).sum()),
+         "n_treino": len(df_treino), "n_teste": len(df_teste)},
         caminho_csv=os.path.join(pasta_resultados, f"resultado_final-{rodada}_{data_execucao}.csv"),
     )
     print(f"=== Concluído: accuracy={metricas['accuracy']:.4f} | tempo_treino={tempo_treino:.1f}s ===", flush=True)
@@ -172,10 +192,11 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str)
 # ---------------------------------------------------------------------------
 # Orquestrador: chama um processo novo por treinamento, em sequência
 # ---------------------------------------------------------------------------
-def orquestrar(modelos: list, rodadas: int, simular: bool) -> int:
+def orquestrar(modelos: list, rodadas: int, simular: bool, undersampling: str) -> int:
     data_execucao = datetime.date.today().strftime("%d%m%Y")
     plano = [(m, r) for m in modelos for r in range(1, rodadas + 1)]
-    print(f"Lote: {len(plano)} treinamento(s) — modelos={modelos}, rodadas por modelo={rodadas}")
+    print(f"Lote: {len(plano)} treinamento(s) — modelos={modelos}, rodadas por modelo={rodadas}, "
+          f"undersampling={undersampling} ({_interpretar_undersampling(undersampling)})")
 
     if simular:
         for m in modelos:
@@ -205,7 +226,8 @@ def orquestrar(modelos: list, rodadas: int, simular: bool) -> int:
         with open(caminho_log, "w", encoding="utf-8") as log:
             processo = subprocess.run(
                 [sys.executable, os.path.abspath(__file__), "--trabalhador",
-                 "--modelo", modelo, "--rodada", str(rodada), "--data", data_execucao],
+                 "--modelo", modelo, "--rodada", str(rodada), "--data", data_execucao,
+                 "--undersampling", undersampling],
                 stdout=log, stderr=subprocess.STDOUT, env=ambiente_filho,
             )
         duracao = time.time() - inicio
@@ -231,6 +253,9 @@ def main() -> int:
                         help=f"Modelos a treinar ({', '.join(MODELOS_ARTIGO)}) ou 'todos'.")
     parser.add_argument("--rodadas", type=int, default=1, help="Rodadas por modelo (padrão: 1).")
     parser.add_argument("--simular", action="store_true", help="Só mostra o plano, sem treinar.")
+    parser.add_argument("--undersampling", default="artigo",
+                        help="Alvo do undersampling: 'artigo' (502 legítimos + 501 phishing, padrão), "
+                             "'minoritaria' (501 + 501) ou 'L,P' (ex.: '502,501').")
     # uso interno (processo trabalhador)
     parser.add_argument("--trabalhador", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--modelo", help=argparse.SUPPRESS)
@@ -243,7 +268,7 @@ def main() -> int:
         return 2
 
     if args.trabalhador:
-        executar_treinamento(args.modelo, args.rodada, args.data)
+        executar_treinamento(args.modelo, args.rodada, args.data, args.undersampling)
         return 0
 
     modelos = list(MODELOS_ARTIGO) if args.modelos == ["todos"] else args.modelos
@@ -254,7 +279,12 @@ def main() -> int:
     if args.rodadas < 1:
         print("--rodadas deve ser >= 1.")
         return 2
-    return orquestrar(modelos, args.rodadas, args.simular)
+    try:
+        _interpretar_undersampling(args.undersampling)
+    except ValueError:
+        print("--undersampling inválido. Use 'artigo', 'minoritaria' ou 'L,P' (ex.: '502,501').")
+        return 2
+    return orquestrar(modelos, args.rodadas, args.simular, args.undersampling)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,7 @@
+ordem,modelo,rodada,status,duracao_processo_s,log
+1,tinybert,2,ok,463.3,resultados\tinybert\log_execucao-2_07102026.txt
+2,tinybert,3,ok,461.5,resultados\tinybert\log_execucao-3_07102026.txt
+3,tinybert,4,ok,466.1,resultados\tinybert\log_execucao-4_07102026.txt
+4,tinybert,5,ok,464.8,resultados\tinybert\log_execucao-5_07102026.txt
+5,tinybert,6,ok,462.9,resultados\tinybert\log_execucao-6_07102026.txt
+6,tinybert,7,ok,484.1,resultados\tinybert\log_execucao-7_07102026.txt
