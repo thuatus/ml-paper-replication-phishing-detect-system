@@ -1,0 +1,4 @@
+ordem,modelo,rodada,status,duracao_processo_s,log
+1,minilm,1,ok,1733.9,resultados\minilm\log_execucao-1_09102026.txt
+2,minilm,2,ok,1573.4,resultados\minilm\log_execucao-2_09102026.txt
+3,minilm,3,ok,1655.4,resultados\minilm\log_execucao-3_09102026.txt

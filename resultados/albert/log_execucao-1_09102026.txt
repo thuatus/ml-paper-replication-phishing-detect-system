@@ -1,0 +1,46 @@
+=== albert (albert-base-v2) — rodada 1 — 09102026 ===
+Estrutura de diretórios criada/confirmada:
+  - dados_philder/
+  - modelo/  (com modelo\checkpoints/)
+  - resultados/
+Total de e-mails legítimos carregados: 2501
+Total de e-mails de phishing carregados: 1565 (coluna: 'body')
+Pré-processamento concluído: 1565 registros (38 ficaram vazios)
+Deduplicação prévia do pool de 'phishing' (texto processado): 1565 e-mails -> 1472 únicos (93 duplicatas descartadas antes da amostragem)
+Traceback (most recent call last):
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\rodar_lote.py", line 291, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\rodar_lote.py", line 271, in main
+    executar_treinamento(args.modelo, args.rodada, args.data, args.undersampling)
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\rodar_lote.py", line 142, in executar_treinamento
+    legitimos_amostrados, phishing_amostrados = consolidacao.amostrar_quantidade_artigo(
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\philder\database_consolidation.py", line 296, in amostrar_quantidade_artigo
+    legitimos_amostrados = _amostrar_sem_duplicatas(
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\philder\database_consolidation.py", line 203, in _amostrar_sem_duplicatas
+    df_temp = pipeline_processamento(df_temp)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\philder\data_processing.py", line 138, in pipeline_processamento
+    df["body_processado"] = df.apply(_processar_linha, axis=1)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\alvar\AppData\Roaming\jupyterlab-desktop\envs\env_philder1\Lib\site-packages\pandas\core\frame.py", line 12437, in apply
+    return op.apply().__finalize__(self, method="apply")
+           ^^^^^^^^^^
+  File "C:\Users\alvar\AppData\Roaming\jupyterlab-desktop\envs\env_philder1\Lib\site-packages\pandas\core\apply.py", line 1015, in apply
+    return self.apply_standard()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\alvar\AppData\Roaming\jupyterlab-desktop\envs\env_philder1\Lib\site-packages\pandas\core\apply.py", line 1167, in apply_standard
+    results, res_index = self.apply_series_generator()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\alvar\AppData\Roaming\jupyterlab-desktop\envs\env_philder1\Lib\site-packages\pandas\core\apply.py", line 1183, in apply_series_generator
+    results[i] = self.func(v, *self.args, **self.kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\philder\data_processing.py", line 135, in _processar_linha
+    texto = remover_stopwords(texto)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Educacao\Mestrado\Aluno Especial\AplicacoesDistribuidas\ProjetoPhilder\ml-paper-replication-phishing-detect-system\philder\data_processing.py", line 118, in remover_stopwords
+    tokens_filtrados = [t for t in tokens if t not in STOPWORDS_INGLES]
+                        ^
+KeyboardInterrupt

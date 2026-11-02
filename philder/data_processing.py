@@ -7,7 +7,9 @@ normalizado antes da tokenização/treino:
 
     1. remoção do cabeçalho SMTP (defesa extra — o Módulo A já separa
        `body` de `smtp_headers` na extração)
-    2. substituição de URLs por um placeholder genérico
+    2. substituição de URLs e de endereços de e-mail por placeholders
+       genéricos ("URL and Email Address Removal", Seção III-B do artigo;
+       a parte dos endereços de e-mail foi acrescentada em 01/11/2026)
     3. normalização do texto (minúsculas + remoção de caracteres especiais)
     4. remoção de stopwords
 
@@ -28,7 +30,32 @@ import re
 
 import pandas as pd
 
-_REGEX_URL = re.compile(r"https?://\S+|www\.\S+")
+# Regex de URL usada até 01/11/2026 (mantida para reproduzir os resultados
+# anteriores; ver `pipeline_processamento(..., mascarar_links_e_emails=False)`).
+_REGEX_URL_ATE_01112026 = re.compile(r"https?://\S+|www\.\S+")
+# 01/11/2026: maiúsculas ("WWW.USAA.COM"), ftp://, barra única ("http:/apple.com"),
+# dois-pontos duplicados ("http:://...") e quebra quoted-printable já achatada
+# em "= " no CSV ("https:= //u1366302.ct.sendgrid...").
+_REGEX_URL = re.compile(r"(?:https?|ftp):[:=\s]*/{1,2}\S*|www\.\S+", re.IGNORECASE)
+# 01/11/2026: endereços de e-mail (ex.: jose@monkey.org). Antes desta data o
+# Módulo B só tratava URLs, e o normalizar_texto transformava o endereço em
+# palavras soltas ("jose monkey org") — presentes em ~40% dos phishing do
+# Nazario (endereço da caixa-isca do corpus) e em <1% dos legítimos.
+# Cobre também: prefixo "mailto:", domínio sem ponto ("125117@localhost"),
+# domínio truncado ("dmcmann@b...", "Sale@...."), IP entre colchetes
+# ("x@[74.208.166.58]"), "=" na parte local ("bounces+whisper=oz.net@python.org"),
+# quebra quoted-printable achatada após o "@" ("jose@= monkey.org") e domínio
+# sem parte local ("RBL:...:@paypal.com:", linhas de filtro antispam — neste
+# caso o domínio precisa ter ponto, para não pegar "@home").
+_REGEX_EMAIL = re.compile(
+    r"(?:mailto:\s*)?"
+    r"(?:[\w.+=-]+@(?:=\s*)?(?:\[[\d.]+\]|\.{3,}|[\w-]+(?:\.[\w-]+)*(?:\.{3})?)"
+    r"|@[\w-]+(?:\.[\w-]+)+)",
+    re.IGNORECASE,
+)
+# 01/11/2026: quebra de linha "suave" do quoted-printable ("=" no fim da linha),
+# que partia links ao meio ("https:=\n//u1366302.ct.sendgrid...").
+_REGEX_QUEBRA_QP = re.compile(r"=(?:\r\n|\r|\n)")
 _REGEX_LINHA_CABECALHO = re.compile(r"^[A-Za-z][A-Za-z\-]*:\s?.*$")
 
 # Lista padrão de stopwords em inglês do NLTK (nltk.corpus.stopwords.words
@@ -82,6 +109,15 @@ def remover_cabecalho_smtp(body: str, smtp_headers: str) -> str:
     return corpo_limpo.strip()
 
 
+def desfazer_quebras_quoted_printable(texto: str) -> str:
+    """Remove as quebras de linha "suaves" da codificação quoted-printable
+    (um "=" no fim da linha, que indica que a linha continua na seguinte).
+    Sem isso, links e endereços partidos por essas quebras não são
+    reconhecidos pelas regex de URL e e-mail. Adicionada em 01/11/2026.
+    """
+    return _REGEX_QUEBRA_QP.sub("", texto)
+
+
 def substituir_urls(texto: str, placeholder: str = "URL") -> str:
     """Localiza URLs no texto (regex) e as substitui por `placeholder`,
     evitando que o modelo aprenda a decorar domínios específicos em vez
@@ -90,6 +126,21 @@ def substituir_urls(texto: str, placeholder: str = "URL") -> str:
     Retorna o texto com as URLs substituídas.
     """
     return _REGEX_URL.sub(f" {placeholder} ", texto)
+
+
+def substituir_emails(texto: str, placeholder: str = "EMAILADDRESS") -> str:
+    """Localiza endereços de e-mail no texto (regex) e os substitui por
+    `placeholder`, pelo mesmo motivo de `substituir_urls`: evitar que o
+    modelo aprenda endereços específicos (ex.: o endereço da caixa-isca
+    do corpus Nazario) em vez do padrão textual do phishing — etapa
+    "URL and Email Address Removal" da Seção III-B do artigo PHILDER.
+
+    O placeholder é diferente da palavra comum "email" (frequente no
+    próprio texto dos e-mails) para que os dois não se confundam.
+
+    Adicionada em 01/11/2026. Retorna o texto com os endereços substituídos.
+    """
+    return _REGEX_EMAIL.sub(f" {placeholder} ", texto)
 
 
 def normalizar_texto(texto: str) -> str:
@@ -119,10 +170,18 @@ def remover_stopwords(texto: str) -> str:
     return " ".join(tokens_filtrados)
 
 
-def pipeline_processamento(df: pd.DataFrame) -> pd.DataFrame:
-    """Aplica, em sequência, `remover_cabecalho_smtp` -> `substituir_urls`
-    -> `normalizar_texto` -> `remover_stopwords` a cada linha de `df`
-    (colunas `body`, `smtp_headers` produzidas pelo Módulo A).
+def pipeline_processamento(df: pd.DataFrame, mascarar_links_e_emails: bool = True) -> pd.DataFrame:
+    """Aplica, em sequência, `remover_cabecalho_smtp` ->
+    `desfazer_quebras_quoted_printable` -> `substituir_urls` ->
+    `substituir_emails` -> `normalizar_texto` -> `remover_stopwords` a
+    cada linha de `df` (colunas `body`, `smtp_headers` produzidas pelo
+    Módulo A).
+
+    `mascarar_links_e_emails` (01/11/2026): True (padrão) substitui todo
+    link e todo endereço de e-mail do corpo, como no artigo PHILDER
+    (Seção III-B). False reproduz exatamente o comportamento anterior a
+    01/11/2026 (só URLs http(s)/www em minúsculas), usado em todos os
+    resultados até essa data (lote de referência de 07/10 incluído).
 
     Retorna o DataFrame de entrada com uma nova coluna `body_processado`.
     """
@@ -130,7 +189,12 @@ def pipeline_processamento(df: pd.DataFrame) -> pd.DataFrame:
 
     def _processar_linha(linha) -> str:
         texto = remover_cabecalho_smtp(linha["body"], linha["smtp_headers"])
-        texto = substituir_urls(texto)
+        if mascarar_links_e_emails:  # 01/11/2026
+            texto = desfazer_quebras_quoted_printable(texto)
+            texto = substituir_urls(texto)
+            texto = substituir_emails(texto)
+        else:  # comportamento até 01/11/2026
+            texto = _REGEX_URL_ATE_01112026.sub(" URL ", texto)
         texto = normalizar_texto(texto)
         texto = remover_stopwords(texto)
         return texto

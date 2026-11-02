@@ -208,7 +208,7 @@ def treinar_modelo(
     args_comuns = dict(
         output_dir=output_dir,
         num_train_epochs=num_train_epochs,
-        per_device_train_batch_size=8,
+        per_device_train_batch_size= 8,
         per_device_eval_batch_size=8,
         eval_strategy="epoch",
         weight_decay=0.01,

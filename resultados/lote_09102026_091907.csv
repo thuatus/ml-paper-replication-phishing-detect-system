@@ -1,0 +1,7 @@
+ordem,modelo,rodada,status,duracao_processo_s,log
+1,albert,2,ok,3301.9,resultados\albert\log_execucao-2_09102026.txt
+2,albert,3,ok,3312.2,resultados\albert\log_execucao-3_09102026.txt
+3,albert,4,ok,3207.0,resultados\albert\log_execucao-4_09102026.txt
+4,mobilebert,1,ok,1527.3,resultados\mobilebert\log_execucao-1_09102026.txt
+5,mobilebert,2,ok,1677.2,resultados\mobilebert\log_execucao-2_09102026.txt
+6,mobilebert,3,ok,1563.2,resultados\mobilebert\log_execucao-3_09102026.txt
