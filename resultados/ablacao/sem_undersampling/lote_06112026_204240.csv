@@ -1,0 +1,7 @@
+ordem,modelo,rodada,status,duracao_processo_s,log
+1,tinybert,1,ok,1198.4,resultados\ablacao\sem_undersampling\tinybert\log_execucao-1_06112026.txt
+2,tinybert,2,ok,1193.6,resultados\ablacao\sem_undersampling\tinybert\log_execucao-2_06112026.txt
+3,tinybert,3,ok,1192.9,resultados\ablacao\sem_undersampling\tinybert\log_execucao-3_06112026.txt
+4,tinybert,4,ok,1186.5,resultados\ablacao\sem_undersampling\tinybert\log_execucao-4_06112026.txt
+5,tinybert,5,ok,1194.4,resultados\ablacao\sem_undersampling\tinybert\log_execucao-5_06112026.txt
+6,tinybert,6,ok,1192.2,resultados\ablacao\sem_undersampling\tinybert\log_execucao-6_06112026.txt

@@ -20,6 +20,8 @@ Uso (a partir da pasta raiz do projeto, onde estão `philder/` e `dados_philder/
     python rodar_lote.py --modelos todos --rodadas 3 --simular   # só mostra o plano
     python rodar_lote.py --modelos todos --rodadas 6 --undersampling artigo        # 502 + 501 (padrão)
     python rodar_lote.py --modelos tinybert --rodadas 1 --undersampling minoritaria # 501 + 501
+    python rodar_lote.py --modelos tinybert --rodadas 6 --ablacao sem_pretreino      # ablação (06/11/2026)
+    python rodar_lote.py --modelos tinybert --rodadas 6 --ablacao sem_undersampling
 
 No Colab/Kaggle (célula):  !python rodar_lote.py --modelos todos --rodadas 1
 
@@ -30,6 +32,19 @@ Saídas (mesmo padrão do notebook)
     resultados/<modelo>/log_execucao-<rodada>_<ddmmaaaa>.txt   (saída completa do processo)
     modelo/<modelo>/                                           (modelo final da última rodada)
     resultados/lote_<ddmmaaaa>_<hhmmss>.csv                    (resumo do lote)
+
+Estudo de ablação (06/11/2026; Tabela 5 do artigo PHILDER)
+----------------------------------------------------------
+`--ablacao` retira um componente do PHILDER por vez. Sem `--ablacao`, nada muda:
+mesmo protocolo, mesmas pastas, mesmo CSV e mesmos hashes do lote oficial.
+    sem_pretreino      -> mesma arquitetura do checkpoint, mas com pesos aleatórios
+                          (AutoConfig + from_config); tokenizer do checkpoint; com undersampling
+    sem_undersampling  -> pesos pré-treinados, sem undersampling: base deduplicada completa
+                          (2.446 legítimos + 501 phishing), mesma divisão estratificada 70/30
+As saídas vão para pastas separadas, sem misturar com os resultados oficiais:
+    resultados/ablacao/<tipo>/<modelo>/...   modelo/ablacao/<tipo>/<modelo>/
+    resultados/ablacao/<tipo>/lote_<ddmmaaaa>_<hhmmss>.csv
+e o CSV de cada rodada ganha a coluna `ablacao`.
 
 O CSV de cada rodada tem as mesmas colunas do notebook, mais colunas de
 rastreabilidade: origem, plataforma, processador, gpu, versões de
@@ -61,6 +76,17 @@ MODELOS_ARTIGO = {
 # "artigo": 502 legítimos + 501 phishing = 1.003 (Figura 2 do PHILDER).
 # "minoritaria": todas as classes no tamanho da minoritária (501 + 501 = 1.002, comportamento até 07/10).
 UNDERSAMPLING_PREDEFINIDOS = {"artigo": {0: 502, 1: 501}, "minoritaria": None}
+
+# Estudo de ablação (06/11/2026) — configurações da Tabela 5 do artigo PHILDER.
+ABLACOES = ("sem_pretreino", "sem_undersampling")
+
+
+def _pastas(modelo: str, ablacao: str | None) -> tuple[str, str]:
+    """(pasta de resultados, pasta do modelo). Sem ablação: as pastas oficiais de sempre."""
+    if ablacao is None:
+        return os.path.join("resultados", modelo), os.path.join("modelo", modelo)
+    return (os.path.join("resultados", "ablacao", ablacao, modelo),
+            os.path.join("modelo", "ablacao", ablacao, modelo))
 
 
 def _interpretar_undersampling(valor: str):
@@ -120,8 +146,10 @@ def _ambiente() -> dict:
 # ---------------------------------------------------------------------------
 # Trabalhador: UM treinamento completo (Módulos A–D), em processo próprio
 # ---------------------------------------------------------------------------
-def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str, undersampling: str) -> None:
-    """Reproduz a sequência de chamadas das células A, B, C e D do notebook."""
+def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str, undersampling: str,
+                         ablacao: str | None = None) -> None:
+    """Reproduz a sequência de chamadas das células A, B, C e D do notebook.
+    `ablacao` (06/11/2026): None (padrão, protocolo oficial), 'sem_pretreino' ou 'sem_undersampling'."""
     from philder import infra
     from philder import database_consolidation as consolidacao
     from philder import data_processing as processamento
@@ -129,11 +157,12 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str,
     from philder import performance_assessment as avaliacao
 
     checkpoint_modelo = MODELOS_ARTIGO[modelo_escolhido]
-    pasta_modelo = os.path.join("modelo", modelo_escolhido)
+    pasta_resultados, pasta_modelo = _pastas(modelo_escolhido, ablacao)
     pasta_checkpoints = os.path.join(pasta_modelo, "checkpoints")
-    pasta_resultados = os.path.join("resultados", modelo_escolhido)
+    os.makedirs(pasta_resultados, exist_ok=True)
 
-    print(f"=== {modelo_escolhido} ({checkpoint_modelo}) — rodada {rodada} — {data_execucao} ===", flush=True)
+    print(f"=== {modelo_escolhido} ({checkpoint_modelo}) — rodada {rodada} — {data_execucao}"
+          f"{'' if ablacao is None else ' — ABLAÇÃO: ' + ablacao} ===", flush=True)
     infra.criar_estrutura_diretorios()
 
     # --- Módulo A: consolidação da base ---
@@ -148,8 +177,14 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str,
     df = processamento.pipeline_processamento(df)
 
     # --- Módulo C: balanceamento + treino + teste ---
-    undersampling_alvo = _interpretar_undersampling(undersampling)
-    df_balanceado = balanceamento.aplicar_undersampling(df, n_por_classe=undersampling_alvo)
+    if ablacao == "sem_undersampling":
+        # Ablação: sem undersampling — base deduplicada completa (2.446 + 501), desbalanceada.
+        df_balanceado = df
+        print(f"ABLAÇÃO sem_undersampling: undersampling NÃO aplicado — "
+              f"{df_balanceado['class_label'].value_counts().to_dict()}", flush=True)
+    else:
+        undersampling_alvo = _interpretar_undersampling(undersampling)
+        df_balanceado = balanceamento.aplicar_undersampling(df, n_por_classe=undersampling_alvo)
     df_treino, df_teste = balanceamento.dividir_treino_teste(df_balanceado)
     impressoes = {
         "hash_balanceado": _impressao(df_balanceado),
@@ -158,7 +193,16 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str,
     }
     print("Impressões digitais:", impressoes, flush=True)
 
-    tokenizer, modelo_pre_treinado = balanceamento.carregar_tokenizer_e_modelo(checkpoint_modelo)
+    if ablacao == "sem_pretreino":
+        # Ablação: mesma arquitetura e mesmo tokenizer do checkpoint, mas pesos aleatórios.
+        from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint_modelo)
+        configuracao = AutoConfig.from_pretrained(checkpoint_modelo, num_labels=2)
+        modelo_pre_treinado = AutoModelForSequenceClassification.from_config(configuracao)
+        print("ABLAÇÃO sem_pretreino: modelo criado com pesos aleatórios (from_config) — "
+              f"{sum(p.numel() for p in modelo_pre_treinado.parameters()):,} parâmetros", flush=True)
+    else:
+        tokenizer, modelo_pre_treinado = balanceamento.carregar_tokenizer_e_modelo(checkpoint_modelo)
     dataset_treino, dataset_teste = balanceamento.tokenizar_dataset(df_treino, df_teste, tokenizer)
     trainer, tempo_treino = balanceamento.treinar_modelo(
         modelo_pre_treinado, tokenizer, dataset_treino, dataset_teste, output_dir=pasta_checkpoints
@@ -177,13 +221,16 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str,
         caminho_imagem=os.path.join(pasta_resultados, f"curva_perda-{rodada}_{data_execucao}.png"),
         titulo=f"Curva de perda — fine-tuning {modelo_escolhido} (rodada {rodada})",
     )
+    registro = {"modelo": modelo_escolhido, "checkpoint": checkpoint_modelo, "rodada": rodada,
+                **metricas, **eficiencia, **_ambiente(), **impressoes,
+                "undersampling": "nenhum" if ablacao == "sem_undersampling" else undersampling,
+                "n_balanceado_legitimos": int((df_balanceado["class_label"] == 0).sum()),
+                "n_balanceado_phishing": int((df_balanceado["class_label"] == 1).sum()),
+                "n_treino": len(df_treino), "n_teste": len(df_teste)}
+    if ablacao is not None:  # coluna só nas execuções de ablação (CSV oficial inalterado)
+        registro["ablacao"] = ablacao
     avaliacao.salvar_resultados(
-        {"modelo": modelo_escolhido, "checkpoint": checkpoint_modelo, "rodada": rodada,
-         **metricas, **eficiencia, **_ambiente(), **impressoes,
-         "undersampling": undersampling,
-         "n_balanceado_legitimos": int((df_balanceado["class_label"] == 0).sum()),
-         "n_balanceado_phishing": int((df_balanceado["class_label"] == 1).sum()),
-         "n_treino": len(df_treino), "n_teste": len(df_teste)},
+        registro,
         caminho_csv=os.path.join(pasta_resultados, f"resultado_final-{rodada}_{data_execucao}.csv"),
     )
     print(f"=== Concluído: accuracy={metricas['accuracy']:.4f} | tempo_treino={tempo_treino:.1f}s ===", flush=True)
@@ -192,28 +239,31 @@ def executar_treinamento(modelo_escolhido: str, rodada: int, data_execucao: str,
 # ---------------------------------------------------------------------------
 # Orquestrador: chama um processo novo por treinamento, em sequência
 # ---------------------------------------------------------------------------
-def orquestrar(modelos: list, rodadas: int, simular: bool, undersampling: str) -> int:
+def orquestrar(modelos: list, rodadas: int, simular: bool, undersampling: str, ablacao: str | None = None) -> int:
     data_execucao = datetime.date.today().strftime("%d%m%Y")
     plano = [(m, r) for m in modelos for r in range(1, rodadas + 1)]
     print(f"Lote: {len(plano)} treinamento(s) — modelos={modelos}, rodadas por modelo={rodadas}, "
-          f"undersampling={undersampling} ({_interpretar_undersampling(undersampling)})")
+          + ("undersampling=nenhum" if ablacao == "sem_undersampling"
+             else f"undersampling={undersampling} ({_interpretar_undersampling(undersampling)})")
+          + ("" if ablacao is None else f", ABLAÇÃO={ablacao}"))
 
     if simular:
         for m in modelos:
-            pasta = os.path.join("resultados", m)
+            pasta = _pastas(m, ablacao)[0]
             inicio = _proxima_rodada_lote(pasta, data_execucao)
             for i in range(rodadas):
-                print(f"  [simulação] {m}: resultados/{m}/resultado_final-{inicio + i}_{data_execucao}.csv")
+                print(f"  [simulação] {m}: {os.path.join(pasta, f'resultado_final-{inicio + i}_{data_execucao}.csv')}")
         return 0
 
     resumo = []
-    os.makedirs("resultados", exist_ok=True)
+    pasta_resumo = "resultados" if ablacao is None else os.path.join("resultados", "ablacao", ablacao)
+    os.makedirs(pasta_resumo, exist_ok=True)
     caminho_resumo = os.path.join(
-        "resultados", f"lote_{data_execucao}_{datetime.datetime.now().strftime('%H%M%S')}.csv"
+        pasta_resumo, f"lote_{data_execucao}_{datetime.datetime.now().strftime('%H%M%S')}.csv"
     )
     proxima_por_modelo = {}  # garante número novo por tentativa, mesmo se uma rodada falhar
     for i, (modelo, _) in enumerate(plano, start=1):
-        pasta_resultados = os.path.join("resultados", modelo)
+        pasta_resultados = _pastas(modelo, ablacao)[0]
         os.makedirs(pasta_resultados, exist_ok=True)
         rodada = max(_proxima_rodada_lote(pasta_resultados, data_execucao), proxima_por_modelo.get(modelo, 1))
         proxima_por_modelo[modelo] = rodada + 1
@@ -227,7 +277,8 @@ def orquestrar(modelos: list, rodadas: int, simular: bool, undersampling: str) -
             processo = subprocess.run(
                 [sys.executable, os.path.abspath(__file__), "--trabalhador",
                  "--modelo", modelo, "--rodada", str(rodada), "--data", data_execucao,
-                 "--undersampling", undersampling],
+                 "--undersampling", undersampling]
+                + ([] if ablacao is None else ["--ablacao", ablacao]),
                 stdout=log, stderr=subprocess.STDOUT, env=ambiente_filho,
             )
         duracao = time.time() - inicio
@@ -256,6 +307,9 @@ def main() -> int:
     parser.add_argument("--undersampling", default="artigo",
                         help="Alvo do undersampling: 'artigo' (502 legítimos + 501 phishing, padrão), "
                              "'minoritaria' (501 + 501) ou 'L,P' (ex.: '502,501').")
+    parser.add_argument("--ablacao", choices=ABLACOES, default=None,
+                        help="Estudo de ablação (Tabela 5 do artigo): 'sem_pretreino' (pesos aleatórios) ou "
+                             "'sem_undersampling' (base completa). Sem esta opção: protocolo oficial.")
     # uso interno (processo trabalhador)
     parser.add_argument("--trabalhador", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--modelo", help=argparse.SUPPRESS)
@@ -268,7 +322,7 @@ def main() -> int:
         return 2
 
     if args.trabalhador:
-        executar_treinamento(args.modelo, args.rodada, args.data, args.undersampling)
+        executar_treinamento(args.modelo, args.rodada, args.data, args.undersampling, args.ablacao)
         return 0
 
     modelos = list(MODELOS_ARTIGO) if args.modelos == ["todos"] else args.modelos
@@ -284,7 +338,9 @@ def main() -> int:
     except ValueError:
         print("--undersampling inválido. Use 'artigo', 'minoritaria' ou 'L,P' (ex.: '502,501').")
         return 2
-    return orquestrar(modelos, args.rodadas, args.simular, args.undersampling)
+    if args.ablacao == "sem_undersampling" and args.undersampling != "artigo":
+        print("Aviso: --undersampling é ignorado com --ablacao sem_undersampling.")
+    return orquestrar(modelos, args.rodadas, args.simular, args.undersampling, args.ablacao)
 
 
 if __name__ == "__main__":
