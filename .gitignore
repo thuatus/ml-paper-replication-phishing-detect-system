@@ -12,3 +12,12 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Documentos de trabalho (não publicados no repositório)
+Analise_dos_Resultados.md
+Embasamento_Teorico_Metricas_PHILDER.md
+Guia_Fase2_*.md
+Relatorio_*.md
+Relatorio_*.pdf
+Relatório*.md
+Relatório*.pdf

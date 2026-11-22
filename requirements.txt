@@ -1,0 +1,19 @@
+# Dependências da replicação do PHILDER
+# Ambiente dos resultados oficiais: Python 3.12.13, Windows, CPU (sem GPU)
+#
+# Versões fixadas: registradas automaticamente nos CSVs de resultado (resultados/<modelo>/resultado_final-*.csv).
+# Demais pacotes: versão mínima; para fixar todas as versões do ambiente local, gerar com `pip freeze`.
+#
+# PyTorch para CPU:
+#   pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+
+torch==2.14.0
+transformers==5.16.1
+accelerate
+datasets
+scikit-learn
+pandas
+numpy
+matplotlib
+jupyterlab

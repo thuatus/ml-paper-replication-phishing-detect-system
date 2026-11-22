@@ -1,0 +1,678 @@
+\documentclass[12pt]{article}
+
+\usepackage{sbc-template}
+\usepackage{color}
+\usepackage{booktabs}
+\usepackage{graphicx,url}
+
+\usepackage[caption=false]{subfig}
+
+\usepackage[brazil]{babel}   
+%\usepackage[latin1]{inputenc}  
+\usepackage[utf8]{inputenc}  
+% UTF-8 encoding is recommended by ShareLaTex
+
+\usepackage{multirow}
+\usepackage{array}
+
+\usepackage{comment}
+
+%Para a função \sout{}
+\usepackage{ulem}
+
+%\linespread{1.02}
+
+\usepackage[algoruled,linesnumbered]{algorithm2e}
+
+\usepackage{tikz}
+
+\usepackage{indentfirst}
+
+\usepackage{amsmath} 
+
+\usetikzlibrary{positioning,arrows.meta,fit,calc}
+     
+\sloppy
+
+
+\title{Detecção de \textit{Phishing} em Dispositivos com Recursos Limitados: um Estudo de Reprodutibilidade com Modelos Compactos} 
+
+\author{Álvaro Santana dos Santos Júnior \inst{1} e Vinícius Pereira Gonçalves \inst{1}}
+%\vspace{-0.5cm}
+\address{Universidade de Bras\'ilia -- UnB\\
+Caixa Postal 4466 CEP 70910-900 -- Bras\'ilia -- DF -- Brasil 
+  \email{alvaro.junior@outlook.com, vpgvinicius@unb.br} 
+}
+
+
+% Conectivos = https://www.todamateria.com.br/conectivos/
+\begin{document} 
+
+\maketitle
+
+\begin{abstract}
+
+        Phishing detection on resource-constrained devices requires models that achieve high accuracy at low computational cost. PHILDER~\cite{bispo2025philder} addresses this need with a lightweight deep learning approach and identifies TinyBERT as the best trade-off among five compact BERT variants. However, the original work does not report implementation details or the hardware used, which prevents independent verification of its results. This paper presents a replication of PHILDER, evaluating the same five models on phishing detection under a fully documented protocol and comparing the results with those of the original study. TinyBERT achieved an accuracy of 99.39\%, statistically compatible with the 99.27\% originally reported (Welch's $t$-test, $p \geq 0.10$), while training 3.7 to 7.9 times and running inference 4.1 to 17.0 times faster than the other models, which confirms PHILDER's main conclusion by a wider margin than originally reported. The replication also identifies factors that can inflate results in phishing detection, such as duplicate messages, model selection on the test set, dependence on data reading order and spurious correlations that favor overfitting, as well as internal inconsistencies in the original paper. Finally, an ablation study shows that pre-training contributes mainly to the detection of phishing messages.
+
+\end{abstract}
+     
+\begin{resumo} 
+
+        A detecção de \textit{phishing} em dispositivos com recursos limitados exige modelos que conciliem alta acurácia e baixo custo computacional. \cite{bispo2025philder} propõe o PHILDER, um modelo de aprendizado profundo para uso em dispositivos com poder computacional limitado. Entretanto, o trabalho original não disponibiliza detalhes da implementação e o recurso computacional utilizado. Este artigo apresenta uma replicação do PHILDER, por meio da avaliação de cinco modelos de aprendizado profundo na detecção de \textit{phishing}  e a sua comparação com a publicação original. Todo o protocolo foi detalhado e documentado. O TinyBERT obteve acurácia de 99,39\%, estatisticamente compatível com os 99,27\% do artigo original (teste $t$ de Welch, $p \geq 0{,}10$), com treinamento de 3,7 a 7,9 vezes e inferência de 4,1 a 17,0 vezes mais rápidos que os demais modelos, confirmando a conclusão central do PHILDER com margem maior que a reportada. Como contribuições, a replicação identifica fatores que podem inflar resultados na detecção de \textit{phishing}, como duplicatas detectáveis, seleção de modelo pelo conjunto de teste, dependência da ordem de leitura dos dados e correlações que aumentam a tendência de \textit{overfit} do resultado. Um estudo de ablação mostra ainda a contribuição dos componentes do PHILDER para a melhora da qualidade da predição e da eficiência computacional.
+        
+\end{resumo}
+
+\section{Referencial Teórico}
+\label{sec:refteorico}
+
+         Modelos de aprendizado profundo são redes neurais de múltiplas camadas, capazes de aprender representações dos dados diretamente a partir de exemplos~\cite{goodfellow2016deep}. No Processamento de Linguagem Natural (PLN), destaca-se a arquitetura \textit{Transformer}~\cite{vaswani2017attention}, que utiliza mecanismos de atenção para representar cada palavra conforme o seu contexto. Esta seção apresenta os conceitos que fundamentam este trabalho: o BERT, as suas variantes compactas e os hiperparâmetros de treinamento.
+        
+          O \textbf{BERT} (\textit{Bidirectional Encoder Representations from Transformers}) é um modelo de linguagem natural, baseado em Transformer \cite{devlin2019bert}. É um modelo grande , com cerca de 110 milhões de parâmetros e se tornou o estado da arte para modelos de aprendizado profundo na época de sua publicação. Seu tamanho não possibilita a aplicação em dispositivos com recursos computacionais limitados, e, para suprir essa lacuna, foram desenvolvidos diversos modelos que se basearam no BERT, para prover desempenho similar com dimensões menores, e que pudessem ser treinados e aplicados em estruturas de menor poder computacional.
+           
+           Os modelos derivados do BERT aplicam técnicas que compactam a dimensionalidade do modelo maior, com a menor perda possível do desempenho. \textbf{DistilBERT} \cite{sanh2019distilbert}: aplica a destilação de
+conhecimento durante o pré-treinamento, reduzindo o BERT pela metade (6 camadas). Segundo os autores, o modelo é 40\% menor e 60\% mais rápido, preservando 97\% do desempenho do BERT. O \textbf{MobileBERT} \cite{sun2020mobilebert}: é uma versão estreita e profunda do BERT, com 24 camadas e estruturas de gargalo
+(\textit{bottleneck}) que reduzem a dimensão interna de cada bloco. O conhecimento é transferido progressivamente, camada a camada, de um professor com arquitetura compatível. O modelo é independente de tarefa e foi projetado para execução em dispositivos móveis.
+
+        O \textbf{ALBERT} \cite{lan2019albert}: não utiliza destilação, reduzindo parâmetros por meio de duas técnicas: a fatoração da matriz de \textit{embeddings} e o compartilhamento de pesos entre as camadas. A versão base possui cerca de 12 milhões de parâmetros, mas mantém a mesma profundidade e o mesmo volume de operações do BERT base. O \textbf{MiniLM} \cite{wang2020minilm}, por sua vez, realiza a destilação concentrando-se apenas na última camada do professor, transferindo as distribuições de auto atenção e as relações entre os vetores de valores (\textit{value relation}). Essa simplificação dispensa o alinhamento entre as camadas do professor e do aluno, permitindo maior flexibilidade na arquitetura do aluno.
+
+    O \textbf{TinyBERT} \cite{jiao2019tinybert}  propõe a destilação específica para \textit{Transformers}, em que o aluno aprende a reproduzir não apenas as saídas do professor, mas também as camadas de \textit{embedding}, as
+matrizes de atenção e os estados ocultos intermediários. A destilação ocorre em duas etapas: geral, no pré-treinamento, e específica da tarefa. A versão de 4 camadas e dimensão 312 é cerca de 7,5 vezes menor e
+9,4 vezes mais rápida que o BERT base. 
+
+        Hiperparâmetros são configurações que controlam o processo de aprendizado e não são ajustadas pelo próprio algoritmo durante o treinamento, ao contrário dos parâmetros (pesos) do modelo, que são obtidos pela minimização da função de perda no conjunto de treino \cite{goodfellow2016deep}. 
+    
+
+
+
+\section{Introdução}
+\label{sec:introducao}
+
+        O avanço tecnológico tornou digital diversas atividades essenciais do cotidiano, como transações bancárias, comércio eletrônico e comunicação corporativa. Contudo, viabilizou também o crescimento dos crimes cibernéticos, que estão cadas vez mais sofisticados. O  \textit{phishing} se destaca entre os ataques por explorar a engenharia social para induzir o usuário a fornecer credenciais, dados financeiros e informações pessoais. O \textit{Anti-Phishing Working Group} registrou 1.069.681 ataques de \textit{phishing} no segundo trimestre de 2026, aumento de 10,1\% em relação ao trimestre anterior, com o maior total mensal desde 2023~\cite{apwg2026q2}. No ambiente corporativo, o \textit{phishing} é o vetor inicial mais frequente de violações de dados (16\% dos casos), cujo custo médio global foi de US\$ 4,44 milhões em 2025, e figura como a principal tática de ataques que empregam inteligência artificial~\cite{ibm2025cost}.
+
+        Nesse cenário, as técnicas de aprendizado profundo, em especial os modelos baseados na arquitetura \textit{Transformer}, como o BERT~\cite{devlin2019bert}, apresentam grande potencial para a detecção de ameaças a partir do Processamento de Linguagem Natural, pois aprendem representações contextuais diretamente dos dados. Esses modelos, entretanto, possuem milhões de parâmetros e exigem capacidade de processamento e memória  incompatíveis com dispositivos de borda, telefones móveis e sistemas embarcados, nos quais a detecção precisa ocorrer com baixa latência e consumo reduzido de recursos. 
+
+       Uma alternativa promissora são as variantes compactas de modelos baseados em \textit{Transformers}, obtidas por técnicas como a destilação de conhecimento e o compartilhamento de parâmetros, que reduzem o custo computacional preservando boa parte da capacidade preditiva do modelo original. Combinadas ao ajuste fino supervisionado, essas variantes permitem especializar o conhecimento linguístico adquirido no pré-treino para a tarefa de detecção de \textit{phishing}, mesmo com conjuntos de dados reduzidos. Avaliar essas soluções, porém, exige considerar não apenas a acurácia preditiva, mas também o seu custo de treinamento e de inferência.
+       
+        Grande parte dos trabalhos de detecção de \textit{phishing} concentra-se na análise de URLs e características de sites, e poucos utilizam modelos de aprendizado profundo para avaliar o conteúdo dos e-mails considerando o custo computacional de detecção da ameaça. O PHILDER~\cite{bispo2025philder} aborda essa lacuna ao comparar as cinco variantes compactas do BERT e propor as métricas TES, IES e RTDE, apontando o TinyBERT como o modelo de melhor equilíbrio entre acurácia e custo. Entretanto, o trabalho não disponibiliza detalhes da arquitetura aplicada, o contexto do recurso computacional utilizado para comparação e um dataset público padronizado para acesso, o que impede a verificação independente de seus resultados. Essa dificuldade não é isolada: a literatura de segurança baseada em aprendizado de máquina aponta dilemas recorrentes, como vazamento de dados e correlações espúrias, que podem inflar os resultados reportados e comprometer sua validade~\cite{arp2022dos}.
+
+        
+       Este trabalho tem como objetivo replicar o modelo PHILDER (\textbf{PH}ishing \textbf{I}ntelligent \textbf{L}ightweight \textbf{DE}tection on \textbf{R}esource-limited devices) de forma independente, verificando se suas conclusões se sustentam com dados públicos e um protocolo integralmente documentado. Os cinco modelos foram avaliados sob as mesmas condições de \textit{hardware}, com seis execuções por modelo. As contribuições deste trabalho são: (i) a verificação dos resultados preditivos e computacionais do PHILDER com uma base de dados pública; (ii) a documentação dos elementos não informados no artigo original, como hiperparâmetros, \textit{checkpoints}, \textit{hardware} e variabilidade entre execuções; (iii) a identificação de fatores que podem inflar resultados na detecção de \textit{phishing}, como duplicatas, seleção de modelo pelo conjunto de teste e dependência da ordem de leitura; e (iv) a replicação do estudo de ablação do artigo original, que evidencia a contribuição do pré-treino e do \textit{undersampling} para o desempenho do modelo. Os resultados confirmam a conclusão central do PHILDER: o TinyBERT obteve acurácia de 99,39\%, estatisticamente compatível com os 99,27\% do artigo original, e foi o modelo mais eficiente, com treinamento de 3,7 a 7,9 vezes e inferência de 4,1 a 17,0 vezes mais rápidos que os demais.
+
+        O restante deste artigo está organizado da seguinte forma: a Seção~\ref{sec:refteorico} apresenta o referencial teórico; a Seção~\ref{sec:trabalhos}, os trabalhos relacionados; a Seção~\ref{sec:implementacao} descreve a arquitetura do modelo, a avaliação de desempenho e o estudo de ablação; e a Seção~\ref{sec:conclusao} apresenta as conclusões. Como replicação, este trabalho possui limitações que devem ser consideradas na interpretação dos resultados: a base de mensagens de \textit{phishing} difere da original; as medições foram realizadas em processador de propósito geral, e não em dispositivos embarcados; o conjunto de teste é reduzido (301 mensagens) e comum a todas as execuções; os hiperparâmetros foram mantidos iguais para todos os modelos, por fidelidade ao protocolo original; e a abordagem de \textit{oversampling} avaliada no artigo original não foi replicada.
+
+      
+\section{Trabalhos relacionados} \label{sec:trabalhos}
+
+        O uso de abordagens baseadas em inteligência artificial para a detecção de ameças cibernéticas, em particular a detecção de \textit{phishing}, possui ampla produção na literatura científica, demonstrando seu potencial para o desenvolvimento de soluções do mundo real.  Os trabalhos relacionados foram baseados na seleção de \cite{bispo2025philder},  que realizou busca na base \textit{Scopus} pelo termo \textit{phishing detection}, restrita à área de Ciência da Computação e aos últimos cinco anos, os mais relevantes foram analisados e divididos entre abordagens de aprendizado de máquina e de aprendizado profundo. Além do estudo de \cite{bispo2025philder}, foi realizada pesquisa de \textit{corpus} de dados públicos e relevantes  utilizados neste campo de pesquisa, a partir das referências de \cite{bispo2025philder}.
+
+\subsection{Abordagens de aprendizado de máquina} \label{sub:trab_am}
+
+        Vários estudos abordam o uso de algorítimos de aprendizado de máquina em conjunto com o Processamento de Linguagem Natural (PLN) com resultados promissores para a inferência de padrões de conteúdo malicioso em textos nas mensagens e-mails e URLs.
+
+        \cite{sahingoz2019machine} \cite{chiew2019new} \cite{alsariera2020ai} \cite{almomani2022phishing} e \cite{ubing2019phishing} realizam a detecção de phishing a partir de URLs, utilizando processamento de linguagem natural e a exploração e seleção de atributos e a combinação de classificadores sobre URLs e características de sites. Os resultados alcançaram acurácia entre 94\%  e 98\%. Em comum, esses estudos não analisam o conteúdo das mensagens e nem mensuram o custo computacional da inferência.   
+
+        Em~\cite{mujtaba2017email}, os autores revisam a classificação de e-mails entre 2006 e 2016, analisando técnicas, atributos e conjuntos de dados, entre eles o Nazario \textit{Phishing Corpus}. A revisão aponta o SVM como a
+abordagem supervisionada mais promissora no período e destaca, como desafios em aberto, o surgimento de novos tipos de ataque e a necessidade de conjuntos de dados melhores. Devido a data da publicação, o estudo não contempla abordagens que utilizam \textit{Transformers}.
+
+\subsection{Abordagens de aprendizado profundo} \label{sub:trab_ap}
+
+        O aprendizado profundo de máquina possibilitou o desenvolvimento de modelos mais complexos, com múltiplas camadas de processamento para representação de dados com vários níveis de abstração e representam o estado da arte em diversas tarefas de processamento de dados não estruturados, como é o caso da detecção de phishing baseada em texto.
+
+        Entre as abordagens aplicadas à análise de e-mails, \cite{alhogail2021applying} e \cite{halgas2020catching} utilizam, respectivamente, grafo classificado por redes convolucionais em grafos (GCN) e redes neurais recorrentes (RNN) para a detecção de \textit{phishing}, obtendo acurácia superior à 98\%. \cite{halgas2020catching} explora mais de um \textit{dataset}. \cite{bispo2025philder} propõe o PHILDER, um \textit{framework} para detecção de \textit{phishing} em e-mails em dispositivos com recursos limitados, que compara cinco variantes compactas do BERT por meio de métricas de predição e desempenho. O estudo apresenta métricas para mensurar o desempenho computacional  (TES, IES e RTDE) e apresenta elevada acurácia (99,27\%). Contudo, o trabalho não detalha a condução do treinamento e do teste nem informa o \textit{hardware} utilizado, o que dificulta a verificação independente dos resultados.
+
+
+\subsection{\textit{Corpus} de Dados} \label{sub:trab_nazario}
+
+        Um conjunto de dados coeso, composto por mensagens reais e de acesso público, é essencial para que a detecção de \textit{phishing} reflita situações reais e possa ser reproduzida em qualquer contexto. O Nazario \textit{Phishing Corpus}\footnote{Disponível em: \url{https://monkey.org/~jose/phishing/}. Acesso em: 29 ago. 2026.} é um conjunto de dados de uso recorrente na literatura para a detecção de \textit{phishing} em e-mails~\cite{mujtaba2017email,halgas2020catching} e \cite{gualberto2020feature}, e mostra-se uma escolha robusta para o uso em pesquisa científica.  Em~\cite{alsubaiey2024novel}, diversos corpora públicos, entre eles Nazario, SpamAssassin e Enron, são consolidados em um conjunto de dados disponibilizado publicamente\footnote{Disponível em: \url{https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset}. Acesso em: 29 ago. 2026.}. O estudo aborda as limitações de acesso à fontes de dados de phishing e propõe o uso de um conjunto de \textit{datasets} públicos de forma consolidada. Como limitação, e a eficiência computacional não é avaliada.
+
+        O uso de modelos de aprendizado de máquina contribuem com soluções de detecção de ameaças eficazes, em particular, modelos mais compactos que possibilitem o uso  de técnicas de detecção sofisticadas em dispositivos com poder de processamento limitado. Estudos que permitam a sua replicação e comparação dos resultados de forma padronizada são essenciais para consolidar a confiabilidade e qualidade dos resultados na literatura.
+
+
+% Tabela Trabalhos Relacionados 
+        \begin{table}[ht]
+        \centering
+        \caption{Comparação entre trabalhos relacionados de detecção de \textit{phishing}}
+        \label{tab:trabalhos_relacionados}
+        \small
+        \setlength{\tabcolsep}{4pt}
+        \renewcommand{\arraystretch}{1.15}
+        \resizebox{\textwidth}{!}{%
+        \begin{tabular}{>{\raggedright\arraybackslash}p{4.8cm}
+                >{\raggedright\arraybackslash}p{1.55cm}
+                >{\raggedright\arraybackslash}p{2.8cm}
+                >{\raggedright\arraybackslash}p{3.1cm}
+                >{\raggedright\arraybackslash}p{3.9cm}
+                >{\raggedright\arraybackslash}p{1.5cm}}
+        \hline
+        \textbf{Artigo} & \textbf{Problema} & \textbf{Técnica} & \textbf{Dados} & \textbf{Métricas} & \textbf{Acurácia} \\
+        \hline
+            \cite{sahingoz2019machine}   & URL   & NLP-based features & OpenPhish, PhishTank & Accuracy, Precision, Recall, F1-Score, ROC-AUC, Confusion Matrix & 97,98\% \\
+            \cite{de2020detecting}       & URL   & Deep Learning (CNN) & PhishTank, OpenPhish & Accuracy, Sensitivity, Specificity, AUC-ROC & 94,80\% \\
+            \cite{chiew2019new}          & URL   & Hybrid Ensemble Feature Selection (HEFS) & UCI Phishing Dataset & Accuracy, Sensitivity, F1-Score, AUC-ROC, TPR, FPR & 94,60\% \\
+            \cite{alsariera2020ai}       & URL   & Ensemble (Extra-Tree)$^{a}$ & PhishTank, Phishing Websites & Accuracy, FPR, FNR, AUC-ROC & 97\% \\
+            \cite{almomani2022phishing}  & URL   & Machine Learning$^{a}$ & Phishing Websites & Accuracy, Recall, F1-Score, AUC-ROC & 97\% \\
+            \cite{ubing2019phishing}     & URL   & Ensemble Learning & Phishing Website Detection & Accuracy, Precision, Recall, F1-Score, ROC-AUC & 95\% \\
+            \cite{tang2022deep}          & URL   & Deep Learning (RNN-GRU) & Phishing Website Detection & Accuracy, Recall, F1-Score, AUC-ROC & 99,18\% \\
+            \cite{mujtaba2017email}      & Email & Revisão (destaca SVM) & PhishingCorpus (Nazario), Enron, outros & Accuracy, Recall, F1-Score, AUC-ROC, FPR & ----\\
+            \cite{alhogail2021applying}  & Email & NLP + GCN & Ham dataset & Accuracy, Precision, Recall, F1-Score & 98,20\% \\
+            \cite{halgas2020catching}    & Email & Deep Learning (RNN) & Nazario, SpamAssassin, Enron & Accuracy, Recall, F1-Score & 98,91\%\\
+            \cite{bispo2025philder} (PHILDER) & Email & Deep Learning (BERT compactos) & PhishTank, SpamAssassin & Accuracy, Precision, Recall, F1-Score, TES, IES, RTDE & 99,27\% \\
+        \hline
+            Este trabalho (replicação, TinyBERT) & Email & Deep Learning (BERT compactos) & Nazario, SpamAssassin & Accuracy, Precision, Recall, F1-Score, TES, IES, RTDE & 99,39\%\\
+        \hline
+        \end{tabular}%
+        }
+        \end{table}
+
+% ################################################################################
+
+
+        A Tabela~\ref{tab:trabalhos_relacionados} resume os trabalhos relacionados e o resultado desta replicação. Para cada trabalho, são indicados o problema abordado, a técnica empregada, os conjuntos de dados, as métricas de avaliação e a acurácia reportada. Observa-se que a maioria dos trabalhos trata de URLs, poucos avaliam e-mails com aprendizado profundo e que apenas o PHILDER inclui métricas de eficiência computacional (TES, IES e RTDE). Nesse contexto, a contribuição deste trabalho é verificar, de forma independente, se os resultados do PHILDER se sustentam com um corpus público e real e padronizar e documentar a arquitetura aplicada para possibilitar a replicação e comparação dos resultados. 
+
+
+\section{Modelo de Implementação} \label{sec:implementacao}
+
+        A implementação tem por objetivo replicar os passos executados no artigo original  \cite{bispo2025philder} para a definição de um modelo de aprendizado profundo de máquina que detecte \textit{phishing}  de forma eficiente e que seja aplicável a sistemas com recursos computacionais limitados.  Propõe-se a documentação dos detalhes de implementação que garanta a replicabilidade do modelo.
+        
+        Foram empregados os mesmos métodos,  práticas e aferição dos resultados do artigo original, considerando o escopo e as limitações deste estudo.   Da mesma forma que  \cite{bispo2025philder}, este modelo foi dividido nas seguintes etapas [Figura~\ref{fig:visao_geral}]:
+
+\textbf{Consolidação da Base de Dados:} aquisição dos dados das mensagens (legítimo e {phishing}) e concatenação deste corpo de dados em um \textit{\textit{dataset}} rotulado em duas classes;
+
+\textbf{Pré-Processamento dos Dados:} normalização e padronização dos \textit{\textit{dataset}s}  de teste e treino;
+
+\textbf{Balanceamento da Base de Dados:}  etapa que envolve a consolidação, separação das amostras, treinamento, teste e medição do desempenho de cada modelo;
+
+\textbf{Avaliação de Desempenho:} avaliação da performance e comparação entre os modelos e os resultados encontrados em relação ao PHILDER (\cite{bispo2025philder}).
+
+
+% Figura Arquitetura do modelo
+
+    \begin{figure}[ht]
+        \centering
+        \resizebox{\textwidth}{!}{%
+        \begin{tikzpicture}[
+        font=\sffamily\small,
+        fase/.style={draw=#1!70!black, thick, fill=#1!30, rounded corners=2pt,
+               minimum width=4.3cm, minimum height=1.1cm,
+               align=center, font=\sffamily\small\bfseries},item/.style={draw=#1!60!black, fill=#1!8, rounded corners=1pt,
+               minimum width=4.3cm, minimum height=0.75cm,
+               align=center, font=\sffamily\footnotesize},
+               seta/.style={-{Stealth[length=2.5mm]}, thick},
+                fina/.style={-{Stealth[length=1.8mm]}, gray!70!black}
+        ]
+        % --- Cores de cada fase ---
+        \colorlet{corA}{blue}
+        \colorlet{corB}{teal}
+        \colorlet{corC}{orange}
+        \colorlet{corD}{violet}
+
+        % --- Fases (linha superior) ---
+        \node[fase=corA] (A) {1. Consolidação\\da Base de Dados};
+        \node[fase=corB, right=0.6cm of A] (B) {2. Pré-Processamento\\dos Dados};
+        \node[fase=corC, right=0.6cm of B] (C) {3. Balanceamento\\da Base de Dados};
+        \node[fase=corD, right=0.6cm of C] (D) {4. Avaliação\\de Desempenho};
+        \draw[seta] (A) -- (B);
+        \draw[seta] (B) -- (C);
+        \draw[seta] (C) -- (D);
+    
+        % --- Etapas-chave de cada fase ---
+        \node[item=corA, below=0.45cm of A] (A1) {Ham: SpamAssassin\\Phishing: Nazario};
+        \node[item=corA, below=0.25cm of A1] (A2) {Rotulagem\\(0 = ham, 1 = phishing)};
+        
+        \node[item=corB, below=0.45cm of B] (B1) {Remoção de cabeçalhos, URLs\\e de endereços de e-mail};
+        \node[item=corB, below=0.25cm of B1] (B2) {Normalização\\do texto};
+        \node[item=corB, below=0.25cm of B2] (B3) {Deduplicação};
+
+        \node[item=corC, below=0.45cm of C] (C1) {Undersampling\\(classes 1:1)};
+        \node[item=corC, below=0.25cm of C1] (C2) {Divisão estratificada\\treino/teste (70/30)};
+        \node[item=corC, below=0.25cm of C2] (C3) {Tokenização};
+        \node[item=corC, below=0.25cm of C3] (C4) {Treino e Teste};
+
+        \node[item=corD, below=0.45cm of D] (D1) {Métricas de \\ Predição};
+        \node[item=corD, below=0.25cm of D1] (D2) {Métricas de Eficiência};
+        \node[item=corD, below=0.25cm of D2] (D3) {Análise e Comparação\\ dos Resultados};
+
+        \foreach \f in {A,B,C,D}{
+            \draw[fina] (\f) -- (\f1);
+            \draw[fina] (\f1) -- (\f2);
+        }
+        \foreach \f in {B,C,D}{ \draw[fina] (\f2) -- (\f3); }
+        \draw[fina] (C3) -- (C4);
+
+        % --- Modelos avaliados ---
+        \node[draw=corC!70!black, dashed, fill=corC!4, rounded corners=2pt,
+        inner sep=4pt, below=0.45cm of C4, minimum width=4.3cm, align=center,
+        font=\sffamily\scriptsize] (M)
+        {TinyBERT, MiniLM, DistilBERT,\\MobileBERT, ALBERT};
+        \draw[fina, dashed] (M) -- (C4);
+        \end{tikzpicture}%
+    }
+    
+    \caption{Visão geral da implementação}
+    \label{fig:visao_geral}
+\end{figure}
+
+% ######################################################################
+
+
+
+
+\subsection{Consolidação da Base de dados} \label{sub:db_cons}
+
+            A primeira etapa deste modelo consiste da aquisição das bases de dados, conforme as fontes de dados descritas por  \cite{bispo2025philder} . Para o treinamento e teste  dos modelos são apresentadas as seguintes referências:
+        
+\textbf{Mensagens Legítimas:} foi utilizado corpus de dados mantido pelo projeto Apache SpamAssassin\footnote{Disponível em: \url{https://spamassassin.apache.org/old/publiccorpus/}. Acesso em: 6 set. 2026.}. Este conjunto de dados possui 2.501 amostras de mensagens legítimas (\textit{ham}), coletadas de listas de e-mails e grupos de usuários, com todo o seu conteúdo preservado. Esta base de dados foi adquirida do sítio do projeto em 06 de setembro de 2026.
+
+ \textbf{Mensagens de \textit{Phishing}:} o Nazario \textit{Phishing Corpus} é uma coleção de e-mails de \textit{phishing} reais reunida por José Nazario, a partir da própria caixa de entrada e utilizada amplamente na literatura acadêmica (\cite{gualberto2020feature},  \cite{alsubaiey2024novel}). A base possui 1565 mensagens de phishing, foi adquirida de \textit{dataset} público disponível no Kaggle e copiada da origem em 29 de agosto de 2026.
+
+        Os \textit{datasets} foram consolidados (\textit{spam asssassin} + \textit{nazario phishingcorpus}), preservando o quantitativo de mensagens do artigo original, sendo 2501 e-mails legítimos e 501 e-mails de \textit{phishing}, totalizando um \textit{dataset} com 3002 mensagens. Esta abordagem foi escolhida para se utilizar um conjunto de dados o mais fidedigno possível ao original ,  com amostras que representam situações reais e que passam ser rotuladas para o treinamento.
+        
+    
+\subsection{Pré-Processamento dos Dados}\label{sub:dt_pre}
+
+        A etapa de pré-processamento apresenta os passos e procedimentos de preparação e normalização dos dados brutos adquiridos, para formar um conjunto consistente e estruturado de dados e servir como um \textit{dataset} de treino e teste em um modelo de aprendizado profundo.  \cite{bispo2025philder} aplicou as seguintes técnicas para padronização do texto:
+        
+        \begin{itemize}
+            \item  \textbf{Remoção do Cabeçalho SMTP:} informações de cabeçalho foram removidas da mensagem, preservando apenas o conteúdo do corpo.
+
+            \item \textbf{Remoção de URL e endereços de e-mail}: as URLs e endereços de e-mail foram substituídos por palavras genéricas para prevenir que o modelo aprenda padrões específicos e não generalize adequadamente a detecção das mensagens.
+
+            \item \textbf{Normalização de Texto:} o texto foi convertido para letras minúsculas e os caracteres especiais foram removidos, garantindo a uniformidade dos dados de entrada.
+
+            \item \textbf{Remoção de \textit{Stopword}:} palavras irrelevantes para a classificação e inferência, como pronomes e conjunções foram removidas do texto, reduzindo o tamanho dimensional dos dados de entrada.
+
+         \end{itemize}
+         
+         Após a aplicação das técnicas acima, identificou-se que, com a remoção do cabeçalho, \textit{links} e endereços de e-mail, algumas mensagens passaram a apresentar o mesmo conteúdo (Figura~\ref{fig:dedeupphishing}). Quando uma dessas mensagens aparece no treino e no teste, o modelo é avaliado com dados que já viu (vazamento de dados), o que infla as métricas~\cite{arp2022dos}. A seguinte técnica foi empregada para mitigar tal situação:
+
+        \begin{itemize}
+            
+        
+        % Figura deduplicacao
+            \begin{figure}[ht]
+            \centering
+            \includegraphics[width=0.8\textwidth]{dedpphishing.png}
+            \caption{Exemplo de mensagens duplicadas após normalização dos dados.}
+            \label{fig:dedeupphishing}
+            \end{figure}
+        % #########################
+ 
+        \item \textbf{Deduplicação de Dados:} As mensagens que se encontravam duplicadas nos \textit{datasets} após a aplicação das técnicas de padronização de texto  foram removidas, preservando um registro único para cada entrada de dados normalizada. A tabela \ref{tab:consolidacao-dataset}  detalha as etapas de normalização aplicadas  ao conjunto dos dados. No final do processo o \textit{dataset} passa a ter um conjunto de  2947 mensagens, sendo 2446 e-mails legítimos e 501 mensagens de \textit{phishing}.
+
+         %Tabela 1
+        \begin{table}[htbp]
+        \centering
+        \caption{Consolidação do\textit{ dataset}}
+        \label{tab:consolidacao-dataset}
+        \begin{tabular}{lrr}
+        \toprule
+        \textbf{Etapa} & \textbf{Legítimos} & \textbf{Phishing} \\
+        \midrule
+        E-mails (remoção cabeçalho, link e \textit{stopword})                 & 2501 & 1565 \\
+        Únicos após deduplicação (pré-amostragem)   & 2446 & 1471\\
+        \quad -- duplicatas descartadas              & 55   & 94\\
+        Incluídos na amostra final                   & 2446 & 501  \\
+        \midrule
+        \textbf{Total consolidado} & \multicolumn{2}{c}{\textbf{2947}} \\
+        \bottomrule
+        \end{tabular}
+        \end{table}
+    \end{itemize}
+    
+    Após a aplicação de todas as técnicas, um conjunto de dados normalizados e consistente, contendo o texto  da mensagem e seu rótulo de classificação , foi produzido como entrada para os modelos de aprendizado profundo de máquina avaliados.
+        
+        
+\subsection{Balanceamento da Base de Dados} \label{sub:db_bal}
+
+            Esta etapa foi iniciada com a aplicação da técnica do \textit{undersampling}  no \textit{dataset} normalizado. A técnica consiste em adequar o conjunto com o maior número de amostras ao conjunto menor.  \cite{bispo2025philder} aplicou a técnica para remover do modelo o desiquilíbrio quantitativo entre as amostras e mitigar esta influência nos modelos de aprendizado profundo.  No artigo original também foi realizada a equiparação com o maior número de amostras (\textit{oversampling}). Esta abordagem foi desconsiderada do escopo da replicação, pois a análise de \cite{bispo2025philder} mostra o impacto da agregação de amostras produzidas sinteticamente ao resultado, com forte tendência ao \textit{overfiting} e o aumento do custo computacional dos modelos. A técnica diverge do foco da pesquisa, que propõe uma solução que seja preditiva e computacionalmente eficiente.
+            
+            Apesar do \textit{dataset} adotado nesta replicação possibilitar a aplicação da técnica do \textit{undersampling} com um número maior de amostras do que as utilizadas por \cite{bispo2025philder}, foi adotado o número de amostras original, pois a alteração do tamanho da \textit{dataset} impactaria na alteração da variância do modelo, influenciando os resultados e na sua comparação com a publicação original. Após a aplicação do \textit{undersampling} foi gerado um \textit{dataset} com 1003 amostras, sendo 502 mensagens legítimas e 501 \textit{phishings} (Figura ~\ref{fig:undersamp}). As amostras foram geradas de forma aleatória, e foi utilizada um valor fixo para a geração da aleatoriedade da escolha (semente). A aplicação desta abordagem permite gerar sempre o mesmo conjunto de informação, tornando o procedimento repetível quando aplicável ao mesmo \textit{dataset}.
+
+            % Figura balanceamento das bases
+            
+            \begin{figure}[ht]
+            \centering
+            \includegraphics[width=0.8\textwidth]{grafico-undersapling.png}
+            \caption{Balanceamento do \textit{dataset}}
+            \label{fig:undersamp}
+            \end{figure}
+            
+            % ###################################
+
+            Após a aplicação da equalização quantitativa de amostras, foi iniciada a etapa de treinamento e teste dos modelos. Os \textit{dataset} foi  convertido em \textit{tokens}, processo padrão para a conversão do \textit{dataset} em um padrão compatível como o modelo de aprendizado profundo, no caso, convertido em tokens pelo tokenizador de cada checkpoint (WordPiece; SentencePiece no caso do ALBERT).
+            
+            Os dados foram divididos em dois conjuntos disjuntos por meio de \textit{holdout} estratificado: 70\% das amostras para treinamento e 30\% para teste, com semente aleatória fixa (\texttt{random\_state=42}). Não foi utilizado conjunto de validação separado: o treinamento seguiu o protocolo do artigo original, com número fixo de épocas e sem seleção de \textit{checkpoint} no conjunto de teste.
+            
+            Foram avaliados cinco modelos leves baseados em BERT: Distilbert, TinyBERT, MobileBERT, ALBERT e MiniLM  [Tabela  \ref{tab:modelos}]. Segundo \cite{bispo2025philder}, os modelos escolhidos apresentam excelente equilíbrio entre desempenho e custo computacional, sendo apropriados para aplicações em tempo real com recursos computacionais limitados.
+            
+         
+            
+            % Tabela Modelos
+                \begin{table}[ht]
+                \centering
+                \caption{Modelos avaliados e respectivos \textit{checkpoints} pré-treinados}
+                \label{tab:modelos}
+                \resizebox{\textwidth}{!}{%
+                \begin{tabular}{llcc}
+                \hline
+                    \textbf{Modelo} & \textbf{Checkpoint (Hugging Face)} &
+                    \textbf{\shortstack{Arquitetura\\(camadas $\times$ dim.)}} &
+                    \textbf{\shortstack{Parâmetros\\(aprox.)}} \\
+                \hline
+                    TinyBERT   & \texttt{huawei-noah/TinyBERT\_General\_4L\_312D} & 4 $\times$ 312  & 14,5 M \\
+                    MiniLM     & \texttt{microsoft/MiniLM-L12-H384-uncased}       & 12 $\times$ 384 & 33 M \\
+                    DistilBERT & \texttt{distilbert-base-uncased}                 & 6 $\times$ 768  & 66 M \\
+                    MobileBERT & \texttt{google/mobilebert-uncased}               & 24 $\times$ 512\textsuperscript{a} & 25 M \\
+                    ALBERT     & \texttt{albert-base-v2}                          & 12 $\times$ 768\textsuperscript{b} & 12 M \\
+                \hline
+                \multicolumn{4}{l}{\footnotesize \textsuperscript{a}Blocos com gargalo interno (\textit{bottleneck}) de 128 dimensões.} \\
+                \multicolumn{4}{l}{\footnotesize \textsuperscript{b}Pesos compartilhados entre as camadas.}
+                \end{tabular}%
+                }
+                \end{table}
+            
+                   Um conjunto de hiperparâmetros padronizado foi aplicado ao treinamento de todos os modelos. A publicação original não detalha as configurações utilizadas no treinamento dos modelos, o que influenciou na definição da manutenção dos valores padronizados para todos os modelos, com alterações pontuais baseadas na análise dos resultados e na inferência de qualquer configuração apresentada no artigo original.
+            
+            
+            % Tabela Hiperparâmetros
+                \begin{table}[ht]
+                \centering
+                \caption{Hiperparâmetros de treinamento aplicados aos cinco modelos}
+                \label{tab:hiperparametros}
+                \begin{tabular}{ll}
+                \hline
+                \textbf{Hiperparâmetro} & \textbf{Valor} \\
+                \hline
+                    Épocas                          & 10 \\
+                    Taxa de aprendizado             & $5 \times 10^{-5}$ \\
+                    Tamanho do lote                 & 8 \\
+                    Otimizador                      & AdamW \\
+                    Agenda da taxa de aprendizado   & Linear, sem \textit{warmup} \\
+                    \textit{Weight decay}           & 0,01 \\
+                    Comprimento máximo da sequência & 128 \textit{tokens} \\
+                    Semente (\textit{seed})         & 42 \\
+                \hline
+            \end{tabular}
+            \end{table}
+
+        A tabela \ref{tab:hiperparametros} apresenta os hiperparâmetros utilizados para a etapa de treinamento dos modelos e o seu respectivo valor.  As definições foram baseadas nos valores padrão da classe \textit{trainer} da biblioteca \textit{Hugging Face} e nas execuções preliminares realizadas para o refinamento da implementação do treinamento e comparação com os resultados obtidos por \cite{bispo2025philder}.
+
+        A etapa de aprendizado dos cinco modelos se deu por meio do ajuste fino (\textit{fine-tunning}), no qual os  pesos pré-treinados, obtidos dos \textit{checkpoints} listados na Tabela \ref{tab:modelos}, foram carregados, uma camada de classificação binária foi acrescentada sobre a representação do texto e todo o modelo foi treinado de forma supervisionada com os e-mails rotulados como \textit{phishing} ou legítimos. Assim, o conhecimento linguístico adquirido no pré-treino é reaproveitado e especializado para a detecção de \textit{phishing}, o que permite bom desempenho mesmo com um conjunto de treino pequeno. A Figura~\ref{fig:treinamento} detalha a sequência do treinamento e avaliação dos modelos, com a apresentação visual de cada etapa do processo com o respectivo parâmetro utilizado.
+        
+        O treinamento utilizou a classe \textit{trainer} da biblioteca \textit{Transformers}, com os hiperparâmetros da Tabela \ref{tab:hiperparametros}, iguais para todos os modelos.  Como o ajuste fino envolve etapas estocásticas e é sensível a elas \cite{dodge2020fine}, cada modelo foi treinado seis vezes. As execuções foram automatizadas por um \textit{script} que inicia um novo processo \textit{Python} para cada treinamento. As execuções foram sequenciais e sem paralelismo, para que cada treinamento dispusesse de todos os recursos da máquina e os tempos medidos fossem comparáveis entre os modelos.
+
+        % Figura Treinamento
+
+        \begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  caixa/.style={draw=#1!70!black, thick, fill=#1!12, rounded corners=2pt,
+                text width=4.3cm, minimum height=1.15cm, align=center,
+                font=\sffamily\footnotesize},
+  destaque/.style={draw=#1!70!black, very thick, fill=#1!30, rounded corners=2pt,
+                minimum width=4.2cm, minimum height=2.6cm, align=center,
+                font=\sffamily\footnotesize},
+  seta/.style={-{Stealth[length=2.3mm]}, thick, gray!70!black}
+]
+\colorlet{corM}{blue}
+\colorlet{corD}{teal}
+\colorlet{corT}{orange}
+\colorlet{corA}{violet}
+
+% --- Caminho do modelo (linha superior) ---
+\node[caixa=corM] (ck) {\textbf{Checkpoint pré-treinado}\\(TinyBERT, MiniLM, DistilBERT,\\MobileBERT ou ALBERT)};
+\node[caixa=corM, right=0.7cm of ck] (cl) {\textbf{+ Camada de}\\\textbf{classificação binária}\\(pesos aleatórios)};
+
+% --- Caminho dos dados (linha inferior) ---
+\node[caixa=corD, below=0.9cm of ck] (tr) {\textbf{Conjunto de treino}\\702 e-mails rotulados\\(351 \textit{phishing} / 351 legítimos)};
+\node[caixa=corD] (tk) at (cl |- tr) {\textbf{Tokenização}\\(máx. 128 \textit{tokens})};
+
+% --- Ajuste fino ---
+\node[destaque=corT, anchor=west] (ft) at ($(cl.east)!0.5!(tk.east)+(0.9cm,0)$)
+  {\textbf{Ajuste fino supervisionado}\\\texttt{Trainer} (\textit{Transformers})\\[3pt]
+   10 épocas $\cdot$ lote 8\\AdamW $\cdot$ taxa $5\times10^{-5}$\\agenda linear $\cdot$ \textit{weight decay} 0,01\\semente 42};
+
+% --- Avaliação ---
+\node[caixa=corA, right=0.9cm of ft, yshift=1.05cm] (ma) {\textbf{Modelo ajustado}};
+\node[caixa=corA, right=0.9cm of ft, yshift=-1.05cm] (av) {\textbf{Avaliação no teste}\\(301 e-mails)\\métricas preditivas e tempos};
+
+\draw[seta] (ck) -- (cl);
+\draw[seta] (tr) -- (tk);
+\draw[seta] (cl.east) -- (ft.west |- cl.east);
+\draw[seta] (tk.east) -- (ft.west |- tk.east);
+\draw[seta] (ft.east |- ma.west) -- (ma.west);
+\draw[seta] (ma) -- (av);
+
+% --- Execução em lote ---
+\node[draw=gray!70!black, dashed, rounded corners=4pt, inner sep=8pt,
+      fit=(ck)(tr)(ft)(ma)(av), label={[font=\sffamily\footnotesize, text=gray!30!black, anchor=north west]south west:
+      Execução em lote: 5 modelos $\times$ 6 execuções, sequenciais, cada uma em um novo processo \textit{Python}}] (lote) {};
+\end{tikzpicture}%
+}
+\caption{Visão geral do treinamento dos modelos}
+\label{fig:treinamento}
+\end{figure}
+
+        % #####################################################################################
+
+        O resultado de cada rodada de treinamento foi mensurado e computado com o auxílio da biblioteca  \textit{scikit-learn} para as métricas de desempenho preditivo (acurácia, precisão, \textit{recall}, F1 e matriz de confusão), calculadas sobre as predições de cada modelo no conjunto de teste. As métricas preditivas indicam desempenho de classificar adequadamente as amostras de teste. Os tempos de treinamento e de teste, que fazem parte das métricas de desempenho, foram medidos com o módulo \texttt{time} do Python. 
+        
+        Uma das grandes contribuições  de  \cite{bispo2025philder}, os indicadores de desempenho computacional, remetem ao desempenho do modelo em treinar, realizar inferência e classificar  adequadamente uma mensagem, sob  o ponto de vista do custo computacional para realizar tais tarefas. Os indicadores são importantes para a avaliação de modelos que sejam implementados em dispositivos com recursos computacionais limitados. A tabela \ref{tab:ambiente} apresenta o recurso computacional utilizado para a avaliação dos modelos, descrevendo o recurso do dispositivo e a sua especificação.
+
+        % Tabela Recursos Computacionais
+        \begin{table}[htb]
+            \centering
+            \caption{Ambiente de hardware e software utilizado na replicação.}
+            \label{tab:ambiente}
+            \begin{tabular}{ll}
+            \hline
+            \textbf{Recurso} & \textbf{Especificação} \\
+            \hline
+            Processador (CPU) & Intel Core i7-8750H @ 2,20~GHz, 6 núcleos / 12 \textit{threads} \\
+            Memória RAM & 16~GB \\
+            Sistema operacional & Windows 11 \\
+            Dispositivo de execução & CPU (sem aceleração por GPU) \\
+            Python & 3.12.13 \\
+            PyTorch & 2.14.0 (versão para CPU) \\
+            \textit{Transformers} & 5.16.1 \\
+            \hline
+            \end{tabular}
+        \end{table}
+
+        % #####################################
+        
+        A eficiência computacional dos modelos foi avaliada em três estágios \cite{bispo2025philder}. A primeira métrica é o \textbf{\textit{Training Efficiency Score} (TES)}, que indica a eficácia do modelo em aprender sob condições restritas de tempo e recursos, sendo definida pela razão entre a acurácia e o tempo de treino (Equação~\ref{eq:tes}).
+
+        % Formulas - TES IES e RTDE
+\par\medskip
+\noindent
+\begin{minipage}{\linewidth}
+    \begin{minipage}{.31\linewidth}
+        \begin{equation}
+            \mathrm{TES} = \frac{\text{Acurácia}}{T_{\text{treino}}}
+            \label{eq:tes}
+        \end{equation}
+    \end{minipage}\hfill
+    \begin{minipage}{.31\linewidth}
+        \begin{equation}
+            \mathrm{IES} = \frac{\text{Acurácia}}{T_{\text{teste}}}
+            \label{eq:ies}
+        \end{equation}
+    \end{minipage}\hfill
+    \begin{minipage}{.31\linewidth}
+        \begin{equation}
+            \mathrm{RTDE} = \frac{\text{Acurácia}}{T_{\text{detecção}}}
+            \label{eq:rtde}
+        \end{equation}
+    \end{minipage}
+
+    \medskip
+    {\small \noindent em que $T_{\text{detecção}} = T_{\text{teste}}/N_{\text{teste}}$ e
+    $N_{\text{teste}}$ é o número de mensagens do conjunto de teste.\par}
+\end{minipage}
+\par\medskip
+
+    % ####################################################################################################
+
+         O segundo estágio utiliza o \textbf{\textit{Inference Efficiency Score} (IES)} para mensurar a eficiência do modelo em classificar dados inéditos,  relevante para a avaliação da detecção em lotes de processamento, comuns em sistemas de detecção de \textit{phishing}. A métrica é expressa pela razão entre a acurácia e o tempo total de teste (Equação~\ref{eq:ies}). 
+   
+         O terceiro estágio avalia a eficiência do modelo em realizar a predição de uma única amostra, em termos de custo de tempo, e reflete a capacidade de produzir predições corretas sob restrições de latência, fator crítico em sistemas de tempo real. A métrica \textbf{\textit{Real-Time Detection Efficiency} (RTDE)} é definida pela razão entre a acurácia e o tempo de detecção (Equação~\ref{eq:rtde}).
+
+        Esta replicação definiu o tempo de detecção como a razão entre o tempo total de teste e o número de mensagens do conjunto de testes, em que $N_{\text{teste}}$ é o número de mensagens do conjunto de teste e $T_{\text{teste}}$ é o tempo total do teste do modelo.
+
+        Nas três métricas valores maiores indicam melhor equilíbrio entre acurácia e custo. O tempo de treinamento inclui a avaliação ao final de cada época. Por dependerem diretamente dos tempos medidos, essas métricas só são comparáveis entre modelos avaliados no mesmo \textit{hardware} e nas mesmas condições de execução. 
+
+        Os resultados obtidos na avaliação dos modelos TinyBERT, DistilBERT, MobileBERT, ALBERT, MiniLM foram consolidados em duas tabelas. A Tabela \ref{tab:resultados_predicao} apresenta os resultados baseados nas métricas de predição, e os compara com os resultados obtidos no artigo original. A Tabela \ref{tab:resultados_computacional} exibe as métricas computacionais dos cinco modelos avaliados.  Os resultados são detalhados na seção \ref{sub:perf_assm}.
+        
+ \subsection{Avaliação de Desempenho} \label{sub:perf_assm}
+
+        As Tabelas \ref{tab:resultados_predicao} e \ref{tab:resultados_computacional} apresentam os resultados dos cinco modelos avaliados em relação ao desempenho preditivo e o desempenho computacional, respectivamente. 
+
+    % Tabela Resultados de Predição
+
+     \begin{table}[ht]
+    \centering
+    \caption{Desempenho preditivo dos cinco modelos: artigo original e replicação}
+    \label{tab:resultados_predicao}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lcccccccc}
+    \hline
+        & \multicolumn{2}{c}{\textbf{Acurácia}} & \multicolumn{2}{c}{\textbf{Precisão}} & \multicolumn{2}{c}{\textbf{Recall}} & \multicolumn{2}{c}{\textbf{F1}} \\
+    \cline{2-9}
+    \textbf{Modelo} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Artigo} & \textbf{Replicação} \\
+    \hline
+        TinyBERT (PHILDER) & 0,9927 & 0,9939 $\pm$ 0,0039 & 0,9896 & 0,9902 $\pm$ 0,0089 & 0,9960 & 0,9978 $\pm$ 0,0034 & 0,9927 & 0,9939 $\pm$ 0,0038 \\
+        DistilBERT         & 0,9934 & 0,9906 $\pm$ 0,0044 & 0,9866 & 0,9837 $\pm$ 0,0106 & 1,0000 & 0,9978 $\pm$ 0,0034 & 0,9932 & 0,9906 $\pm$ 0,0043 \\
+        MobileBERT         & 0,9904 & 0,9906 $\pm$ 0,0033 & 0,9781 & 0,9879 $\pm$ 0,0064 & 0,9865 & 0,9933 $\pm$ 0,0000 & 0,9823 & 0,9906 $\pm$ 0,0032 \\
+        ALBERT             & 0,9834 & 0,9878 $\pm$ 0,0054 & 0,9797 & 0,9815 $\pm$ 0,0111 & 0,9864 & 0,9944 $\pm$ 0,0027 & 0,9831 & 0,9879 $\pm$ 0,0053 \\
+        MiniLM             & 0,9889 & 0,9884 $\pm$ 0,0028 & 0,9857 & 0,9814 $\pm$ 0,0063 & 0,9982 & 0,9956 $\pm$ 0,0034 & 0,9919 & 0,9884 $\pm$ 0,0027 \\
+    \hline
+    \multicolumn{9}{l}{\footnotesize Artigo: Tabela 3 de \cite{bispo2025philder}, configuração com \textit{undersampling} (2).} \\
+    \multicolumn{9}{l}{\footnotesize Replicação: média $\pm$ desvio-padrão de 6 execuções, \textit{undersampling} 502/501, conjunto de teste com 301 mensagens.}
+    \end{tabular}%
+    }
+    \end{table}
+
+    % #############################################################
+
+                
+        Nos termos do desempenho preditivo foram mensuradas a acurácia, precisão, \textit{recall} e F1, considerando o valor médio encontrado ao final de 6 rodadas de treinamento de cada modelo.  Os resultados demonstram que a replicação atingiu desempenho preditivo, próximos ao de \cite{bispo2025philder},  demonstrando a reprodutibilidade dos resultados com a aplicação de método semelhante. 
+                
+       Com exceção do DistilBERT e do MiniLM, todos os modelos apresentaram valor médio de acurácia,  precisão, \textit{recall} e F1 maiores em relação aos achados de \cite{bispo2025philder}. A maior diferença dos dois modelos que apresentaram resultado inferior  foi de 0,43 p.p (precisão) do MiniLM. No caso dos modelos que obtiveram melhoras no resultado, a  maior diferença foi de 0,98 p.p (precisão) do MobileBERT. O teste de Welch~\cite{welch1947generalization} não indicou diferença estatisticamente significativa para nenhum dos modelos ($p \geq 0{,}10$). Os resultados preditivos da replicação são, portanto, compatíveis com os do artigo original.
+                
+        A ordem do desempenho preditivo dos modelos foi parcialmente alterada em relação a \cite{bispo2025philder}: na replicação, o TinyBERT liderou as quatro métricas, enquanto no artigo original o DistilBERT apresentou os melhores valores de acurácia, \textit{recall} e F1. As mudanças, porém, decorrem de diferenças inferiores ao erro-padrão do conjunto de teste e não são estatisticamente significativas ($p \geq 0{,}10$), o que torna mais adequada a comparação por grupos, na qual MiniLM e ALBERT permanecem com o menor desempenho nos dois trabalhos. 
+
+   % Tabela de Resultados de desempenho comoutacional
+
+    \begin{table}[ht]
+    \centering
+    \caption{Desempenho computacional dos cinco modelos na replicação}
+    \label{tab:resultados_computacional}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lcccccc}
+    \hline
+    \textbf{Modelo} & \textbf{T. Treino (s)} & \textbf{T. Teste (s)} & \textbf{T. Detecção (ms)} & \textbf{TES ($\times 10^{-3}$)} & \textbf{IES} & \textbf{RTDE} \\
+    \hline
+        TinyBERT (PHILDER) & 392,3 $\pm$ 4,4     & 2,20 $\pm$ 0,02  & 7,31 $\pm$ 0,08    & 2,534 $\pm$ 0,025 & 0,4519 $\pm$ 0,0050 & 136,02 $\pm$ 1,50 \\
+        DistilBERT         & 1.699,6 $\pm$ 7,8   & 16,25 $\pm$ 0,36 & 53,99 $\pm$ 1,19   & 0,583 $\pm$ 0,005 & 0,0610 $\pm$ 0,0014 & 18,36 $\pm$ 0,42 \\
+        MobileBERT         & 1.466,6 $\pm$ 50,7  & 10,86 $\pm$ 0,76 & 36,09 $\pm$ 2,52   & 0,676 $\pm$ 0,024 & 0,0915 $\pm$ 0,0057 & 27,55 $\pm$ 1,71 \\
+        ALBERT             & 3.085,0 $\pm$ 11,1  & 37,40 $\pm$ 0,19 & 124,25 $\pm$ 0,64  & 0,320 $\pm$ 0,003 & 0,0264 $\pm$ 0,0002 & 7,95 $\pm$ 0,06 \\
+        MiniLM             & 1.430,8 $\pm$ 12,7  & 9,10 $\pm$ 0,07  & 30,23 $\pm$ 0,23   & 0,691 $\pm$ 0,006 & 0,1086 $\pm$ 0,0010 & 32,70 $\pm$ 0,30 \\
+    \hline
+    \multicolumn{7}{l}{\footnotesize Média $\pm$ desvio-padrão de 6 execuções. TES = acurácia / tempo de treino; IES = acurácia / tempo de teste; RTDE = acurácia / tempo de detecção (s).} \\
+    \multicolumn{7}{l}{\footnotesize Tempo de treino bruto (inclui a avaliação por época). CPU Intel com 12 \textit{threads}, sem GPU.}
+    \end{tabular}%
+    }
+    \end{table}
+ 
+   % #################################################################################
+        
+        A Tabela \ref{tab:resultados_computacional} apresenta os resultados computacionais obtidos. Os valores absolutos não foram comparados com os de \cite{bispo2025philder}, pois o artigo original não informa o \textit{hardware} nem o procedimento de medição utilizados; é possível, contudo, comparar a ordem relativa dos modelos. O TinyBERT apresentou o melhor desempenho em todas as métricas, com treinamento de 3,7 a 7,9 vezes e inferência de 4,1 a 17,0 vezes mais rápidos que os demais, seguido por MiniLM, MobileBERT, DistilBERT e ALBERT, ordem mantida em todas as métricas e coerente com o volume de computação de cada arquitetura. No artigo original, a ordem varia entre as métricas, e o TinyBERT lidera apenas o tempo de detecção e a RTDE. Ainda assim, a replicação confirma, com margem maior, a conclusão de que o TinyBERT oferece o melhor equilíbrio entre desempenho preditivo e custo computacional. 
+
+        Os resultados indicam que o TinyBERT apresenta o melhor equilíbrio entre desempenho preditivo e uso de recursos computacionais entre os modelos avaliados. Com acurácia de $0{,}9939 \pm 0{,}0039$, estatisticamente compatível com a reportada em \cite{bispo2025philder}, o modelo obteve os menores tempos de treinamento, teste e detecção. Esse resultado confirma, de forma independente, a principal conclusão do PHILDER: modelos compactos baseados no BERT permitem detectar \textit{phishing} em e-mails com alta acurácia e baixo custo computacional, característica essencial para a implantação em dispositivos com recursos limitados, sendo soluções promissoras para o uso em aplicações do mundo real em dispositivos com capacidade computacional limitada.
+    
+
+
+ \subsection{Estudos de Ablação} \label{sub:est_ablacao}
+
+       Para avaliar a contribuição dos componentes do PHILDER, foi conduzido um estudo de ablação seguindo o protocolo de \cite{bispo2025philder}, no qual componentes relevantes do \textit{framework} foram removidos, um de cada vez, para avaliar o seu impacto nos resultados. Além do TinyBERT, com pesos pré-treinados e \textit{undersampling}, utilizado como a referência de melhor equilíbrio entre desempenho preditivo e custo computacional, foram consideradas as seguintes configurações: (i) sem \textit{undersampling}, com pesos pré-treinados e treinamento sobre o conjunto de dados desbalanceado; e (ii) sem pré-treino, com pesos inicializados aleatoriamente e \textit{undersampling}.  Os hiperparâmetros da Tabela \ref{tab:hiperparametros} foram preservados em todas as configurações avaliadas.
+
+
+       
+
+  % Tabela Estudos de Ablação - desempenho preditivo
+    \begin{table}[ht]
+        \centering
+        \caption{Estudo de ablação do TinyBERT -- desempenho preditivo: artigo original e replicação}
+        \label{tab:ablacao_predicao}
+        \resizebox{\textwidth}{!}{%
+        \begin{tabular}{lccccccccc}
+        \hline
+        & \multicolumn{2}{c}{\textbf{Acurácia}} & \multicolumn{2}{c}{\textbf{F1}} & \textbf{Precisão} & \textbf{Recall} & \textbf{Acurácia} & \textbf{Taxa de} & \textbf{Taxa de} \\
+        \cline{2-5}
+        \textbf{Configuração} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Replicação} & \textbf{Replicação} & \textbf{balanceada} & \textbf{FP} & \textbf{FN} \\
+        \hline
+        Completo (pré-treino + \textit{undersampling}) & 0,9927 & 0,9939 $\pm$ 0,0039 & 0,993 & 0,9939 $\pm$ 0,0038 & 0,9902 & 0,9978 & 0,9939 & 0,99\% & 0,22\% \\
+        Sem pré-treino            & 0,9345 & 0,9801 $\pm$ 0,0021 & 0,925 & 0,9797 $\pm$ 0,0021 & 0,9955 & 0,9644 & 0,9800 & 0,44\% & 3,56\% \\
+        Sem \textit{undersampling} & 0,9682 & 0,9968 $\pm$ 0,0011$^{a}$ & 0,958 & 0,9906 $\pm$ 0,0033 & 0,9879 & 0,9933 & 0,9954 & 0,25\% & 0,67\% \\
+        \hline
+        \multicolumn{10}{l}{\footnotesize Artigo: Tabela 5 de \cite{bispo2025philder}. Replicação: média $\pm$ desvio-padrão de 6 execuções. Taxa de FP: legítimos classificados como \textit{phishing}; taxa de FN: \textit{phishing} não detectado.} \\
+        \multicolumn{10}{l}{\footnotesize $^{a}$Conjunto de teste desbalanceado (735 legítimos / 150 \textit{phishing}); nas demais configurações, 151 / 150. A acurácia não é comparável entre configurações; a acurácia balanceada é.}
+        \end{tabular}%
+        }
+    \end{table}
+
+    
+    % ######################################################################################################
+
+        As Tabelas \ref{tab:ablacao_predicao} e \ref{tab:ablacao_computacional} mostram os efeitos da ablação realizada nos resultados. A remoção dos pesos pré-treinados reduziu a acurácia balanceada de 0,9939 para 0,9800, queda concentrada na detecção das mensagens de \textit{phishing}: a taxa de falsos negativos passou de 0,22\% para 3,56\%, enquanto a de falsos positivos se manteve baixa. O resultado acompanha a tendência relatada em~\cite{bispo2025philder}, embora com efeito menor (redução de 1,4 p.p. na acurácia, contra 5,8 p.p. no artigo original). A retirada do \textit{undersampling} não alterou a qualidade geral da classificação (acurácia balanceada de 0,9954), mas modificou a qualidade do aprendizado: mais mensagens de \textit{phishing} deixaram de ser detectadas (FN 0,67\%), confirmando a perda de \textit{recall} apontada no artigo original, e menos mensagens legítimas foram classificadas incorretamente. 
+
+        
+    % Tabela Estudos de Ablação - desempenho computacional
+       
+        \begin{table}[ht]
+        \centering
+        \caption{Estudo de ablação do TinyBERT -- desempenho computacional na replicação e variação relativa}
+        \label{tab:ablacao_computacional}
+        \resizebox{\textwidth}{!}{%
+        \begin{tabular}{lccccccccc}
+        \hline
+        & & & & \multicolumn{2}{c}{\textbf{TES relativo}} & \multicolumn{2}{c}{\textbf{IES relativo}} & \multicolumn{2}{c}{\textbf{RTDE relativo}} \\
+        \cline{5-10}
+        \textbf{Configuração} & \textbf{T. Treino (s)} & \textbf{T. Teste (s)} & \textbf{T. Detecção (ms)} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Artigo} & \textbf{Replicação} & \textbf{Artigo} & \textbf{Replicação} \\
+        \hline
+        Completo (pré-treino + \textit{undersampling}) & 392,3 $\pm$ 4,4 & 2,20 & 7,31 & 1,00 & 1,00 & 1,00 & 1,00 & 1,00 & 1,00 \\
+        Sem pré-treino             & 425 $\pm$ 2    & 2,29 & 7,60 & 0,87 & 0,91 & 0,85 & 0,95 & 0,90 & 0,95 \\
+        Sem \textit{undersampling} & 1.160 $\pm$ 3  & 6,45$^{a}$ & 7,29 & 0,99 & 0,34 & 0,99 & 0,34$^{a}$ & 1,00 & 1,01 \\
+        \hline
+        \multicolumn{10}{l}{\footnotesize Valores relativos: métrica da configuração dividida pela da configuração completa. Artigo: calculados a partir da Tabela 5 de~\cite{bispo2025philder}, cujas métricas} \\
+        \multicolumn{10}{l}{\footnotesize de eficiência são normalizadas por critério não informado. Replicação: fórmulas brutas, mesmo \textit{hardware} (CPU Intel com 12 \textit{threads}, sem GPU).} \\
+        \multicolumn{10}{l}{\footnotesize $^{a}$Teste com 885 mensagens (301 nas demais configurações).}
+        \end{tabular}%
+        }
+    \end{table}
+
+  % ########################################################################################################
+
+        O principal efeito observado na ablação foi computacional: o tempo de treinamento triplicou, e o TES caiu para 0,34 do valor da configuração completa, enquanto a RTDE permaneceu inalterada, por se tratar da mesma arquitetura. Esse resultado diverge da Tabela 5 de~\cite{bispo2025philder}, que reporta TES praticamente igual com e sem \textit{undersampling}, mas é coerente com a Figura 3 do mesmo artigo, na qual a razão entre os dois valores é igualmente de 0,34. As duas decisões de projeto do PHILDER se confirmam por razões distintas: o pré-treino é determinante para a detecção do \textit{phishing}, e o \textit{undersampling} contribui sobretudo para a eficiência do treinamento e para a prioridade à classe de maior risco. 
+
+
+ 
+\section{Conclusão}
+\label{sec:conclusao}
+
+
+        Este trabalho teve como objetivo verificar, de forma independente, os resultados do PHILDER~\cite{bispo2025philder},  \textit{framework} que propõe o uso de modelos compactos baseados no BERT para a detecção de \textit{phishing} em e-mails em dispositivos com recursos limitados. O trabalho original não disponibiliza código, hiperparâmetros nem informações de \textit{hardware}, e a base de mensagens utilizada não está mais acessível, o que impedia a confirmação de suas conclusões.
+
+        Para isso, o \textit{framework} foi replicado com base em seu método e com o uso de um conjunto de dados públicos (corpora Nazario e SpamAssassin). Adicionalmente, foi aplicada a deduplicação das mensagens, para evitar que o conteúdo repetido influísse no conjunto de treino e teste. Os cinco modelos do artigo original foram avaliados sob o mesmo protocolo, no mesmo \textit{hardware} e em seis execuções cada, com os hiperparâmetros e os procedimentos de medição documentados. O TinyBERT obteve acurácia de 99,39\%, estatisticamente compatível com os 99,27\% reportados, e foi o modelo mais eficiente em todas as métricas computacionais, com treinamento de 3,7 a 7,9 vezes e inferência de 4,1 a 17,0 vezes mais rápidos que os demais. O estudo de ablação confirmou as duas decisões de projeto do PHILDER: o pré-treino é determinante para a detecção das mensagens de \textit{phishing}, e o \textit{undersampling} contribui principalmente para a eficiência do treinamento.
+
+        Os resultados confirmam a conclusão central do PHILDER \cite{bispo2025philder}, com margem superior à sugerida pelos dados do próprio artigo original, e indicam que o TinyBERT é uma solução viável para a detecção de \textit{phishing} em dispositivos com recursos limitados. Além da confirmação, a replicação contribui com um protocolo documentado e reprodutível e com a identificação de fatores que podem inflar resultados nessa área, como duplicatas visíveis apenas após o pré-processamento, a seleção de modelo pelo conjunto de teste, a dependência da ordem de leitura dos dados e correlações espúrias associadas à fonte de coleta, além de inconsistências internas no artigo original. 
+        
+        A documentação desta replicação com o código-fonte, resultados e o registro das execuções dos modelos está disponível no repositório do \textit{github}~\cite{santosjunior2026philderrepl} para auxiliar a verificação dos resultados, bem como uma replicação independente. Como trabalhos futuros, sugerem-se a uso de \textit{benchmark} comparativo de desempenho computacional e a execução em dispositivos embarcados reais, incluindo medições de memória e consumo de energia.
+
+\bibliographystyle{sbc}
+\bibliography{sbc-template}
+
+\end{document}

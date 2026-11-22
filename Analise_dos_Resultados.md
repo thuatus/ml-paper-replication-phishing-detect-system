@@ -11,6 +11,10 @@
 
 > **Atualização de 02/11/2026.** Nova Seção 10: **lote oficial com máscaras de links e e-mails** (5 modelos × 6 execuções, 01–02/11/2026). Por decisão do usuário, **passa a ser o resultado de referência oficial da replicação**; o lote de 07/10 (Seções 5 e 8) fica como registro histórico e como condição "sem máscara" da ablação (Seção 10.4). A conclusão passou a ser a Seção 11 (referências cruzadas atualizadas).
 
+> **Atualização de 07/11/2026.** Nova Seção 11: **estudo de ablação do PHILDER** (TinyBERT; sem pré-treino e sem *undersampling*, 6 execuções cada, 06/11), comparado com a Tabela 5 do artigo, com as inconsistências encontradas nela. A conclusão passou a ser a Seção 12 (referências cruzadas atualizadas).
+
+> **Atualização de 10/11/2026.** Nova Seção 12: **quadro geral comparativo** com todos os valores do artigo original (Tabelas 3, 4 e 5 e Figuras 3–5) e da replicação — métricas preditivas, tempos de treino, teste e detecção, TES, IES e RTDE, e a ablação. Inclui duas inconsistências novas do artigo (Figuras × Tabela 3 por modelo; TinyBERT (1) × Tabela 5). A conclusão passou a ser a Seção 13 (referências cruzadas atualizadas).
+
 **Estrutura do documento**
 
 | Seção | Conteúdo |
@@ -25,7 +29,9 @@
 | 8 | Automação, alinhamento do undersampling e lote final (04–07/10) |
 | 9 | Execuções complementares de 09/10: rodadas extras (MiniLM, ALBERT, MobileBERT), experimento de hiperparâmetros do ALBERT, execução no Kaggle |
 | 10 | **Lote oficial com máscaras de links e e-mails (01–02/11) — resultado de referência atual**; ablação com/sem máscara; comparação com o artigo |
-| 11 | Conclusão, lições metodológicas, hiperparâmetros recomendados pelos autores e pendências consolidadas |
+| 11 | **Estudo de ablação do PHILDER** (06/11): sem pré-treino, sem *undersampling* e sem máscara, comparado com a Tabela 5 do artigo |
+| 12 | **Quadro geral comparativo: PHILDER original × replicação** — todas as métricas preditivas, tempos, TES, IES, RTDE e ablação |
+| 13 | Conclusão, lições metodológicas, hiperparâmetros recomendados pelos autores e pendências consolidadas |
 
 ---
 
@@ -50,13 +56,14 @@
 | 07/10/2026 | **Undersampling alinhado ao artigo: 502 legítimos + 501 phishing = 1.003** (Figura 2 do artigo) | `aplicar_undersampling(..., n_por_classe=...)` (Módulo C), variável `undersampling_alvo` no notebook (células de configuração, C e D) e opção `--undersampling` no `rodar_lote.py` (padrão "artigo"). Validação com 1 execução do TinyBERT pelo notebook (Acc. 0,9900; 3 FP, 0 FN). O conjunto de teste muda (novo sorteio do split). Ver Seção 8.4 |
 | 07/10/2026 (09h06–23h39) | 502/501, protocolo "artigo", **5 modelos × 6 execuções** via `rodar_lote.py --modelos todos --rodadas 6`, PC local | **Lote final — resultado de referência oficial atual.** 30 execuções sem falha, mesmos dados em todas (hashes idênticos). TinyBERT 0,9934 ± 0,0021; DistilBERT 0,9928 ± 0,0014; MobileBERT 0,9856 ± 0,0034; ALBERT 0,9839 ± 0,0044; MiniLM 0,9806 ± 0,0039. Ver Seções 5 e 8.5–8.10 |
 | 08/10/2026 | — | Reorganização deste documento: linha do tempo completada, nota de estratificação corrigida (Seção 1.1), histórico de referências (Seção 1.3), comparação final atualizada (Seção 5), conclusão movida para o final (Seção 10) |
-| 09/10/2026 | — | **Levantamento dos hiperparâmetros de fine-tuning recomendados** nos model cards do Hugging Face e nos artigos originais dos cinco modelos. Os model cards não trazem receita de fine-tuning; as recomendações estão nos artigos. O protocolo único deste trabalho fica fora das faixas recomendadas para ALBERT e MiniLM. Ver Seção 11.6 |
+| 09/10/2026 | — | **Levantamento dos hiperparâmetros de fine-tuning recomendados** nos model cards do Hugging Face e nos artigos originais dos cinco modelos. Os model cards não trazem receita de fine-tuning; as recomendações estão nos artigos. O protocolo único deste trabalho fica fora das faixas recomendadas para ALBERT e MiniLM. Ver Seção 13.6 |
 | 09/10/2026 (07h47–13h22) | Mesmos dados (502/501), protocolo "artigo", `rodar_lote.py`, PC local | **Rodadas complementares:** MiniLM × 3 (07h47–09h10), ALBERT × 3 e MobileBERT × 3 (09h19–13h22; a 1ª tentativa do ALBERT foi interrompida manualmente às 09h18, sem resultado). Todas com os hashes de referência. MobileBERT repete exatamente 07/10 (0,9856); ALBERT (0,9790) e MiniLM (0,9790) empatam, um pouco abaixo de 07/10. Ver Seção 9.2 |
 | 09/10/2026 (tarde) | Notebook do Kaggle (`philder_kaggle.ipynb`, fora do repositório) | **Preparação da execução no Kaggle:** `drive.mount` do Colab não funciona no Kaggle; criado notebook próprio com três fontes de código (GitHub fixado em commit, zip no Drive, Kaggle Dataset), conferência de MD5 dos dados brutos e processados e registro de proveniência. Execução bloqueada: a ativação da internet exige verificação de telefone, e o código SMS não chegou. Ver Seção 9.4 |
 | 09/10/2026 (20h48–21h38) | ALBERT, 502/501, **lr 1e-5, batch 32, warmup 6%** (Tabela 14 do artigo do ALBERT), demais parâmetros iguais; célula independente no `philder.ipynb` | **Experimento complementar de hiperparâmetros (1 rodada):** treino estável, sem platô e sem picos de perda; acurácia 0,9734 (6 FP + 2 FN), sem ganho em relação ao protocolo principal. Ver Seção 9.3 |
 | 01/11/2026 | Células temporárias de inspeção no `philder.ipynb` (só leitura; não alteram o pipeline) | **Evidência da deduplicação:** todas as 80 duplicatas descartadas (93 e-mails de phishing em 49 grupos; 55 de ham em 31 grupos) só se tornam iguais **depois** do pré-processamento — nenhuma tem texto bruto idêntico. Observações sobre o pré-processamento: remoção de negações pelas stopwords, quebra de palavras acentuadas, `\r` no Nazario, conteúdo repetido dentro do mesmo e-mail e quase-duplicatas de campanhas. Ver Seção 1.4 |
 | 01/11/2026 | `philder/data_processing.py`: novas funções `substituir_emails` e `desfazer_quebras_quoted_printable`, regex de URL ampliada e parâmetro `mascarar_links_e_emails=True` em `pipeline_processamento` (aprovado pelo usuário) | **Divergência corrigida:** o Módulo B não mascarava endereços de e-mail, ao contrário do artigo (Seção III-B, "URL and Email Address Removal"). O endereço da caixa-isca do Nazario virava "jose monkey org" em ≈ 40% dos phishing e < 1% dos legítimos. Com a máscara: "monkey" cai para 12,2% dos phishing; deduplicação do phishing 1.565 → 1.471 (antes 1.472); **novos hashes** (balanceado `ba57e8a3…`). O lote de 07/10 passa a ser a condição "sem máscara". Ver Seção 1.5 |
 | 01–02/11/2026 | Rodada de validação do TinyBERT (arquivos `valida_*`) e lote `python rodar_lote.py --modelos todos --rodadas 6` com as máscaras (19h58 de 01/11 às 09h47 de 02/11) | **Novo resultado de referência oficial.** 30 de 30 execuções "ok", hashes idênticos. TinyBERT 0,9939 ± 0,0039 (artigo 0,9927 ± 0,0006); DistilBERT 0,9906; MobileBERT 0,9906; MiniLM 0,9884; ALBERT 0,9878. Os cinco modelos ficam a ≤ 1,3 e-mail das médias do artigo; FN caem em todos os modelos. Ver Seção 10 |
+| 06/11/2026 | `rodar_lote.py` com o parâmetro `--ablacao` (aprovado pelo usuário); rodadas de teste (prefixo `_`), lote sem pré-treino (12h58–13h43) e lote sem *undersampling* (20h42–22h42), TinyBERT, 6 execuções cada | **Estudo de ablação (Tabela 5 do artigo).** Sem pré-treino: 0,9801 ± 0,0021, com 5–6 phishing perdidos por rodada (taxa de FN 3,6%). Sem *undersampling*: acurácia balanceada 0,9954 (igual ao completo), mais FN (0,67% contra 0,22%) e menos FP, treino 2,96× mais caro. A Tabela 5 do artigo contradiz a sua Figura 3 no TES. Ver Seção 11 |
 
 ### 1.1 Nota sobre "n (teste)": não é uma contagem só de phishing
 
@@ -195,7 +202,7 @@ Uma primeira célula temporária, que mostra um e-mail de cada classe do `df` j�
 2. **Conteúdo repetido dentro do mesmo e-mail.** Alguns e-mails do Nazario trazem a mensagem duas vezes no próprio corpo (provavelmente as versões texto e HTML coladas no CSV). Não é falha da deduplicação, que compara e-mails entre si. O efeito no modelo é pequeno: com `max_length=128`, só os primeiros ≈ 128 tokens são lidos.
 3. **A remoção de stopwords apaga negações.** "Please **do not** reply" vira "please reply", porque "do" e "not" estão na lista do NLTK. Para modelos da família BERT, que interpretam a frase em contexto, isso remove informação. O Módulo B segue o pré-processamento descrito no artigo e **não foi alterado**; o ponto entra como limitação e como candidato ao estudo de ablação (com e sem remoção de stopwords). *Complemento (01/11):* o artigo descreve a etapa como remoção de palavras comuns, citando como exemplo **pronomes e conjunções** (Seção III-B); não diz qual lista usa nem menciona negações. A lista do NLTK vai além desses exemplos (inclui "not", "no", "nor" e auxiliares). É uma escolha de implementação nossa, não uma exigência do artigo, e fica registrada como possível divergência.
 4. **Letras acentuadas quebram palavras.** O filtro `[^a-z0-9\s]` troca letras acentuadas por espaço: "pièces" vira "pi ces", "immédiatement" vira "imm diatement". O impacto é pequeno num corpus quase todo em inglês.
-5. **Quase-duplicatas de campanhas.** O Nazario contém e-mails da mesma campanha com textos quase iguais, mas não idênticos (ex.: dois e-mails "HRM / New Payroll Bulletin", com 854 e 2.895 caracteres). A deduplicação exata não os remove. Se um cair no treino e outro no teste, o modelo pode "reconhecer" a campanha — uma forma mais sutil do vazamento corrigido em setembro. **Não verificado ainda**; registrado como pendência (checagem de similaridade treino/teste, Seção 11.5).
+5. **Quase-duplicatas de campanhas.** O Nazario contém e-mails da mesma campanha com textos quase iguais, mas não idênticos (ex.: dois e-mails "HRM / New Payroll Bulletin", com 854 e 2.895 caracteres). A deduplicação exata não os remove. Se um cair no treino e outro no teste, o modelo pode "reconhecer" a campanha — uma forma mais sutil do vazamento corrigido em setembro. **Não verificado ainda**; registrado como pendência (checagem de similaridade treino/teste, Seção 13.5).
 
 ### 1.5 Divergência no Módulo B: endereços de e-mail não eram mascarados (01/11/2026)
 
@@ -308,7 +315,7 @@ Por decisão do usuário, o que não é link nem endereço de e-mail faz parte d
 |---|---|---|---|---|---|---|---|
 | TinyBERT (2) | 0,9927 | 0,9896 | 0,9960 | 0,9927 | 180,52 | 6,22 | 12,9811 |
 
-> **Correção 01/10/2026:** até esta data, os tempos desta tabela traziam os valores da linha **DistilBERT (2)** da Tabela 3 do artigo (111,83 s / 4,48 s / 14,8841 ms). Substituídos pelos da linha **TinyBERT (2)** (180,52 s / 6,22 s / 12,9811 ms). As métricas preditivas já estavam corretas. A Tabela 4 do artigo reporta, para TinyBERT (undersampling), Acurácia 0,9927 ± 0,0006 e F1 0,9927 ± 0,0006 (3 execuções).
+> **Correção 01/10/2026:** até esta data, os tempos desta tabela traziam os valores da linha **DistilBERT (2)** da Tabela 3 do artigo (111,83 s / 4,48 s / 14,8841 ms). Substituídos pelos da linha **TinyBERT (2)** (180,52 s / 6,22 s / 12,9811 ms). As métricas preditivas já estavam corretas. A Tabela 4 do artigo reporta, para TinyBERT (undersampling), Acurácia 0,9927 ± 0,0006 e F1 0,9927 ± 0,0004 (3 execuções). *Correção 10/11/2026:* o desvio do F1 é ± 0,0004 (antes registrado como ± 0,0006), conferido na imagem da tabela.
 
 ### Tabela 2 — Métricas de Eficiência Computacional (valores brutos, não normalizados)
 
@@ -581,7 +588,7 @@ Os tempos (e, portanto, TES, IES e RTDE) só são comparáveis entre linhas medi
 **Leitura**
 
 1. **Com o protocolo do artigo, a replicação empata com o artigo nas métricas preditivas** (Acurácia e F1 iguais até a 4ª casa decimal). A "vantagem" de 25/09(b) sobre o artigo (+0,40 p.p.) tem o mesmo tamanho do efeito do viés de seleção medido aqui (≈ 0,0039 ≈ 1,2 e-mail em 301), e desaparece quando o teste deixa de participar das decisões de treino.
-2. **As 6 execuções não são amostras independentes.** O recall tem desvio-padrão zero: 5 das 6 execuções erram exatamente os mesmos 2 e-mails (1 FP + 1 FN), e a execução 2 erra 1 FP a mais. As curvas de perda diferem entre execuções (não-determinismo do treino), mas o modelo final converge para as mesmas decisões, porque dados, split e semente do `Trainer` (42) são fixos. O ± mede só o não-determinismo de execução, não a incerteza do modelo — os p-valores acima devem ser lidos com essa ressalva (pseudo-replicação). Reforça a pendência de variar `random_state` (split) e `seed` (treino). *Decisão posterior (início da Fase 3):* manter o split e as sementes fixos no protocolo principal e tratar a variação de sementes no estudo de ablação (Seção 11.5).
+2. **As 6 execuções não são amostras independentes.** O recall tem desvio-padrão zero: 5 das 6 execuções erram exatamente os mesmos 2 e-mails (1 FP + 1 FN), e a execução 2 erra 1 FP a mais. As curvas de perda diferem entre execuções (não-determinismo do treino), mas o modelo final converge para as mesmas decisões, porque dados, split e semente do `Trainer` (42) são fixos. O ± mede só o não-determinismo de execução, não a incerteza do modelo — os p-valores acima devem ser lidos com essa ressalva (pseudo-replicação). Reforça a pendência de variar `random_state` (split) e `seed` (treino). *Decisão posterior (início da Fase 3):* manter o split e as sementes fixos no protocolo principal e tratar a variação de sementes no estudo de ablação (Seção 13.5).
 3. **No protocolo antigo, a seleção no teste amplificava o ruído:** pequenas diferenças na trajetória mudavam a época escolhida, gerando variância maior (DP 0,0021 vs. 0,0014 na acurácia; resultado perfeito, 1,0000, na execução 2 de 25/09(b)). As curvas de 01/10 mostram o mecanismo — ex.: execução 4 com loss de avaliação ≈ 0,02 na época 3, ponto que o early stopping teria selecionado.
 4. **Os 2 e-mails errados por todas as execuções são casos estruturalmente difíceis** — candidatos a análise de erros (rótulo ambíguo ou phishing com aparência legítima).
 5. **Tempos.** Com épocas fixas, o tempo de treino fica estável (CV 2,7% vs. 12,7% em 25/09(b)) e o TES torna-se comparável entre execuções e entre modelos. A avaliação por época custa só ≈ 5,6% do treino, não explicando a diferença para o artigo. A diferença de tempo de **teste** entre os lotes (2,34 s vs. 3,92 s) não decorre do protocolo (a inferência é idêntica) — é variação de ambiente entre dias, já observada antes (25/09(a): 2,23 s); por isso, diferenças de IES/RTDE entre lotes não devem ser atribuídas a causas metodológicas. Dentro do próprio lote, as execuções 5 e 6 tiveram teste mais lento (2,72 s e 2,43 s), indicando máquina mais carregada.
@@ -661,7 +668,7 @@ Referência até 01/11: lote final de 07/10/2026 — protocolo fiel ao artigo (1
 
 1. **Desempenho preditivo do PHILDER reproduzido.** Acurácia e F1 do TinyBERT ficam a +0,07 p.p. do artigo (≈ 0,2 e-mail em 301), bem dentro do erro-padrão binomial (≈ ±0,5 p.p.). Três dos cinco modelos (TinyBERT, DistilBERT e ALBERT) ficam a menos de meio e-mail das médias do artigo.
 2. **A afirmação central do artigo se sustenta — com mais força do que no próprio artigo.** O TinyBERT empata com o modelo mais preciso (DistilBERT, diferença de 0,2 e-mail) e é o mais barato em todas as medidas de tempo: 3,9–7,8× mais rápido no treino e 4,2–17,1× na inferência. No artigo, pela Tabela 3, essa vantagem quase não aparece (MiniLM e DistilBERT treinariam mais rápido que o TinyBERT).
-3. **Diferenças em relação ao artigo.** MiniLM (−2,5 e-mails) e MobileBERT (−1,4) ficaram abaixo do artigo, o que muda a ordem dos modelos intermediários (artigo: DistilBERT > TinyBERT > MobileBERT > MiniLM > ALBERT; replicação: TinyBERT ≈ DistilBERT > MobileBERT ≈ ALBERT > MiniLM). Entre esses três modelos as diferenças (1–1,5 e-mail) estão próximas do erro-padrão; a separação entre o grupo superior (≈ 2 erros) e o inferior (4–6 erros) é nítida. As causas prováveis — sobreajuste do MiniLM com 10 épocas fixas, erro sistemático do MobileBERT em 3 e-mails — estão na Seção 8.9. Os hiperparâmetros recomendados pelos autores de cada modelo (Seção 11.6) indicam que o protocolo único desfavorece em especial o ALBERT (learning rate 5× maior que o recomendado, sem warmup) e o MiniLM (10 épocas contra 3–5 recomendadas). *Atualização 09/10:* nas rodadas complementares, ALBERT e MiniLM empataram (0,9790 cada) e, somando os dois dias, a diferença entre eles cai para ≈ 0,7 e-mail — a ordem entre esses dois não é estável, e a comparação deve ser apresentada **por grupos** (Seção 9.2). Um ALBERT com os hiperparâmetros do artigo original treinou de forma estável, mas sem ganho de acurácia numa rodada (Seção 9.3).
+3. **Diferenças em relação ao artigo.** MiniLM (−2,5 e-mails) e MobileBERT (−1,4) ficaram abaixo do artigo, o que muda a ordem dos modelos intermediários (artigo: DistilBERT > TinyBERT > MobileBERT > MiniLM > ALBERT; replicação: TinyBERT ≈ DistilBERT > MobileBERT ≈ ALBERT > MiniLM). Entre esses três modelos as diferenças (1–1,5 e-mail) estão próximas do erro-padrão; a separação entre o grupo superior (≈ 2 erros) e o inferior (4–6 erros) é nítida. As causas prováveis — sobreajuste do MiniLM com 10 épocas fixas, erro sistemático do MobileBERT em 3 e-mails — estão na Seção 8.9. Os hiperparâmetros recomendados pelos autores de cada modelo (Seção 13.6) indicam que o protocolo único desfavorece em especial o ALBERT (learning rate 5× maior que o recomendado, sem warmup) e o MiniLM (10 épocas contra 3–5 recomendadas). *Atualização 09/10:* nas rodadas complementares, ALBERT e MiniLM empataram (0,9790 cada) e, somando os dois dias, a diferença entre eles cai para ≈ 0,7 e-mail — a ordem entre esses dois não é estável, e a comparação deve ser apresentada **por grupos** (Seção 9.2). Um ALBERT com os hiperparâmetros do artigo original treinou de forma estável, mas sem ganho de acurácia numa rodada (Seção 9.3).
 4. **Eficiência: padrão consistente, mas diferente do artigo.** O treino é ≈ 2,3× mais lento e a inferência ≈ 2,7× mais rápida que no artigo, o mesmo padrão já visto em 01/10 (Seção 3.4, item 6). Isso não se explica só por "hardware mais fraco"; hipóteses: configuração não documentada no artigo (comprimento de sequência, batch de inferência, inclusão da tokenização no tempo de teste) e/ou uso de GPU pelos autores. As métricas de eficiência só são comparáveis no mesmo hardware (Seção 7.5).
 5. **Ressalva estatística.** As 6 execuções variam apenas o não-determinismo do treino, com dados e teste fixos: os desvios-padrão medem a estabilidade do fine-tuning, não a incerteza sobre dados novos. Diferenças de 1–2 e-mails entre modelos não devem ser declaradas significativas.
 
@@ -1102,7 +1109,7 @@ Acurácia e erros por execução, em resumo:
 ### 8.10 Status
 
 - **Este lote é a referência oficial da replicação desde 07/10** (Seções 1.3 e 5): usa o tamanho de amostra do artigo, os cinco modelos e 6 execuções por modelo, com dados idênticos em todas as execuções.
-- Estudo detalhado dos resultados: iniciado em 08/10. Pendências consolidadas na Seção 11.5.
+- Estudo detalhado dos resultados: iniciado em 08/10. Pendências consolidadas na Seção 13.5.
 
 ---
 
@@ -1113,7 +1120,7 @@ Acurácia e erros por execução, em resumo:
 Depois do lote final de 07/10 (referência, Seção 8), foram feitas em 09/10 três frentes complementares. Nenhuma altera o resultado de referência:
 
 1. **Rodadas extras do protocolo principal** para os três modelos do grupo inferior (MiniLM, ALBERT e MobileBERT), para verificar a estabilidade da ordem entre eles (Seção 9.2).
-2. **Experimento de hiperparâmetros do ALBERT**, com a receita do artigo original do modelo (Seção 11.6), para testar se a instabilidade e o desempenho mais baixo do ALBERT vêm da configuração única do protocolo (Seção 9.3).
+2. **Experimento de hiperparâmetros do ALBERT**, com a receita do artigo original do modelo (Seção 13.6), para testar se a instabilidade e o desempenho mais baixo do ALBERT vêm da configuração única do protocolo (Seção 9.3).
 3. **Preparação da execução no Kaggle**, como alternativa de nuvem ao Colab (Seção 9.4).
 
 ### 9.2 Rodadas extras do protocolo principal (MiniLM, ALBERT, MobileBERT)
@@ -1166,7 +1173,7 @@ Depois do lote final de 07/10 (referência, Seção 8), foram feitas em 09/10 tr
 
 ### 9.3 Experimento complementar: ALBERT com os hiperparâmetros do artigo original
 
-**Motivação.** O levantamento da Seção 11.6 mostrou que o artigo do ALBERT usa, na tarefa mais parecida com a nossa (SST-2, Tabela 14), learning rate 1e-5, batch 32 e warmup de ≈ 6% — contra 5e-5, batch 8 e nenhum warmup no protocolo principal. O teste verifica se essa diferença explica a instabilidade (platô em ln 2, picos de perda) e o desempenho mais baixo do ALBERT.
+**Motivação.** O levantamento da Seção 13.6 mostrou que o artigo do ALBERT usa, na tarefa mais parecida com a nossa (SST-2, Tabela 14), learning rate 1e-5, batch 32 e warmup de ≈ 6% — contra 5e-5, batch 8 e nenhum warmup no protocolo principal. O teste verifica se essa diferença explica a instabilidade (platô em ln 2, picos de perda) e o desempenho mais baixo do ALBERT.
 
 **Desenho.** Configuração **fixada antes da execução**, a partir do artigo, sem nenhuma escolha feita olhando o teste (não há viés de seleção). Só três parâmetros mudam; o resto é idêntico ao protocolo principal.
 
@@ -1213,7 +1220,7 @@ Depois do lote final de 07/10 (referência, Seção 8), foram feitas em 09/10 tr
 2. **A acurácia não melhorou** nesta rodada: 8 erros, 1 a 3 a mais que as médias do protocolo principal — diferença dentro do erro-padrão (≈ 1,5 e-mail). Com uma rodada, não se pode afirmar piora; afirma-se apenas **ausência de ganho visível**.
 3. **Sobreajuste após a época 4:** a perda de avaliação mínima (0,071) e a acurácia máxima (0,9834) ocorreram na época 4; depois o modelo estabiliza em 0,9734. A receita do artigo foi calibrada para o SST-2 (≈ 21 mil passos); aqui são 220 passos num conjunto pequeno. **Escolher 4 épocas a partir deste resultado seria viés de seleção no teste** (Seção 3.4); só uma validação separada do treino justificaria essa escolha.
 4. **Treino ≈ 6% mais rápido** (3.011 s contra ≈ 3.200 s), provavelmente pelo melhor aproveitamento da CPU com batch 32; o tempo de teste não muda (batch de avaliação mantido em 8).
-5. **Para o trabalho:** os indícios apontam que os hiperparâmetros explicam a **instabilidade** do ALBERT, mas não a **distância de acurácia** para o TinyBERT — o que reforça a conclusão central. É um indício de **uma rodada**; para virar resultado, faltam ao menos mais duas rodadas com a mesma configuração (Seção 11.5).
+5. **Para o trabalho:** os indícios apontam que os hiperparâmetros explicam a **instabilidade** do ALBERT, mas não a **distância de acurácia** para o TinyBERT — o que reforça a conclusão central. É um indício de **uma rodada**; para virar resultado, faltam ao menos mais duas rodadas com a mesma configuração (Seção 13.5).
 
 ### 9.4 Preparação da execução no Kaggle
 
@@ -1227,7 +1234,7 @@ Depois do lote final de 07/10 (referência, Seção 8), foram feitas em 09/10 tr
 - **Validação:** o caminho completo (clone, checkout, proveniência, MD5 e hashes 502/501) foi simulado com sucesso fora do Kaggle, com uma cópia local do repositório; o preparo de dados em Linux reproduziu os hashes de referência 502/501 e 501/501. Não foi possível testar a autenticação real no repositório privado nem as células de treino.
 - Correção após o primeiro uso: os comandos `git` passaram a falhar imediatamente (e com limite de 5 minutos) quando não há credencial válida, em vez de ficarem esperando usuário e senha.
 
-**Situação.** Execução **bloqueada**: no Kaggle, o acesso à internet (necessário para baixar os modelos do Hugging Face e clonar o GitHub) exige verificação de telefone, e o código SMS não chegou. Alternativas: Colab (já validado, Seção 7) ou Kaggle sem internet, com os modelos e o projeto enviados como Datasets (Seção 11.5).
+**Situação.** Execução **bloqueada**: no Kaggle, o acesso à internet (necessário para baixar os modelos do Hugging Face e clonar o GitHub) exige verificação de telefone, e o código SMS não chegou. Alternativas: Colab (já validado, Seção 7) ou Kaggle sem internet, com os modelos e o projeto enviados como Datasets (Seção 13.5).
 
 ## 10. Lote oficial com máscaras de links e e-mails (01–02/11/2026)
 
@@ -1366,13 +1373,210 @@ Somando os cinco modelos (média por rodada): FN 9,0 → 3,2; FP 10,2 → 11,5.
 
 - **Resultado de referência oficial a partir de 02/11/2026:** este lote (Seções 10.2–10.5). O lote de 07/10 (Seções 5 e 8) passa a ser registro histórico e condição "sem máscara" da ablação.
 - **Pendente (depende de consentimento):** atualizar `HASHES_REFERENCIA` nos notebooks `philder.ipynb` e `philder_kaggle.ipynb` para os hashes desta seção.
-- **Próximos passos:** análise de erros (FN do MobileBERT, FP de todos os modelos), checagem de quase-duplicatas treino/teste e demais itens da Seção 11.5.
+- **Próximos passos:** análise de erros (FN do MobileBERT, FP de todos os modelos), checagem de quase-duplicatas treino/teste e demais itens da Seção 13.5.
 
 ---
 
-## 11. Conclusão e próximos passos
+## 11. Estudo de ablação do PHILDER (TinyBERT, 06/11/2026)
 
-### 11.1 Síntese da trajetória
+> **Objetivo.** Replicar a Tabela 5 do artigo: retirar um componente do PHILDER por vez e medir quanto cada um contribui. Como no artigo, só com o TinyBERT. A comparação com/sem máscara de links e e-mails (Seção 10.4), que não existe no artigo, entra na mesma tabela.
+
+### 11.1 Configurações
+
+| Configuração | Pré-treino | *Undersampling* | Máscaras de links e e-mails | Origem dos resultados |
+|---|---|---|---|---|
+| **PHILDER completo** | sim | sim (502 / 501) | sim | lote oficial de 01–02/11 (Seção 10), não reexecutado |
+| **Sem pré-treino** (*w/o pretraining*) | **não** — mesma arquitetura, pesos aleatórios | sim (502 / 501) | sim | lote de 06/11, 12h58–13h43 |
+| **Sem *undersampling*** (*w/o undersampling*) | sim | **não** — base deduplicada completa (2.446 / 501) | sim | lote de 06/11, 20h42–22h42 |
+| Sem máscara (só nesta replicação) | sim | sim (502 / 501) | **não** | lote de 07/10 (Seção 8) |
+
+**Dados de cada configuração**
+
+| Configuração | Base | Treino | Teste | Hashes (balanceado / treino / teste) |
+|---|---|---|---|---|
+| Completo e sem pré-treino | 1.003 (502 / 501) | 702 (351 / 351) | 301 (151 / 150) | `ba57e8a3…` / `ab6aef26…` / `ccfa3c36…` |
+| Sem *undersampling* | 2.947 (2.446 / 501) | 2.062 (1.711 / 351) | 885 (735 / 150) | `ff1e208e00266993e4f95549dd6019e3` / `6bfc5100620dca5f872a40c0a8eb16fc` / `8cbf710e1a16b8f4f81535054153e63f` |
+| Sem máscara | 1.003 (502 / 501) | 702 (351 / 351) | 301 (151 / 150) | `b5eed2f9…` / `d7ee4165…` / `c2aecb1b…` |
+
+No artigo, a base sem *undersampling* tinha 2.501 legítimos; aqui são 2.446, por causa da deduplicação (Seção 1.4).
+
+### 11.2 Implementação e execução
+
+**Alteração no `rodar_lote.py` (aprovada pelo usuário e gravada em 06/11/2026; md5 `73a00b24…`).** Só o `rodar_lote.py` mudou; os módulos do pacote `philder` ficaram intactos.
+
+- Novo parâmetro `--ablacao {sem_pretreino, sem_undersampling}`. **Sem ele, o protocolo oficial não muda:** mesmas pastas, CSV sem coluna nova e mesmos hashes (conferido antes de gravar, com o treino simulado).
+- `sem_pretreino`: tokenizer do checkpoint e modelo criado só a partir da configuração, com pesos aleatórios:
+  ```python
+  tokenizer = AutoTokenizer.from_pretrained(checkpoint_modelo)
+  configuracao = AutoConfig.from_pretrained(checkpoint_modelo, num_labels=2)
+  modelo_pre_treinado = AutoModelForSequenceClassification.from_config(configuracao)
+  ```
+  O log confirma a mesma arquitetura (14.350.874 parâmetros). Os pesos iniciais não têm semente fixa, como a camada de classificação no protocolo oficial: cada rodada parte de uma inicialização diferente.
+- `sem_undersampling`: o `aplicar_undersampling` é pulado; a base deduplicada completa vai para a mesma divisão estratificada 70/30 (`random_state=42`).
+- Saídas separadas dos resultados oficiais: `resultados/ablacao/<tipo>/tinybert/`, `modelo/ablacao/<tipo>/tinybert/` e resumo `resultados/ablacao/<tipo>/lote_<data>_<hora>.csv`; o CSV de cada rodada ganha a coluna `ablacao` (e `undersampling = nenhum` no sem *undersampling*).
+
+**Execução (PC local; mesmo ambiente, protocolo e hiperparâmetros do lote oficial).**
+
+- **Rodadas de teste (manhã de 06/11):** uma de cada configuração, para validar o código. Renomeadas pelo usuário com o prefixo `_` e **fora das médias**. A de sem *undersampling* foi atípica (4 FP; treino de 1.344 s).
+- **Sem pré-treino:** `python rodar_lote.py --modelos tinybert --rodadas 6 --ablacao sem_pretreino` — 6 de 6 "ok", ≈ 7,5 min por rodada. Resumo `resultados/ablacao/sem_pretreino/lote_06112026_125758.csv`.
+- **Sem *undersampling*:** `python rodar_lote.py --modelos tinybert --rodadas 6 --ablacao sem_undersampling` — 6 de 6 "ok", ≈ 20 min por rodada. Resumo `resultados/ablacao/sem_undersampling/lote_06112026_204240.csv`. O encadeamento logo após o sem pré-treino não iniciou (às 13h43); o lote foi iniciado à noite.
+
+### 11.3 Resultados (média ± desvio-padrão, n = 6 por configuração)
+
+**Desempenho preditivo**
+
+| Configuração | Teste (ham / phishing) | Acurácia | Precisão | Recall | F1 | FP / FN (por rodada) | Taxa de FP (FP ÷ legítimos) | Taxa de FN (FN ÷ phishing) | Acurácia balanceada |
+|---|---|---|---|---|---|---|---|---|---|
+| **PHILDER completo** (lote oficial 01–02/11) | 151 / 150 | 0,9939 ± 0,0039 | 0,9902 ± 0,0089 | 0,9978 ± 0,0034 | 0,9939 ± 0,0038 | 1,5 / 0,3 | 0,99% | 0,22% | 0,9939 ± 0,0039 |
+| Sem pré-treino | 151 / 150 | 0,9801 ± 0,0021 | 0,9954 ± 0,0056 | 0,9644 ± 0,0034 | 0,9797 ± 0,0021 | 0,7 / 5,3 | 0,44% | 3,56% | 0,9800 ± 0,0021 |
+| Sem *undersampling* | 735 / 150 | 0,9968 ± 0,0011\* | 0,9879 ± 0,0049 | 0,9933 ± 0,0042 | 0,9906 ± 0,0033 | 1,8 / 1,0 | 0,25% | 0,67% | 0,9954 ± 0,0022 |
+| Sem máscara de links e e-mails (lote 07/10) | 151 / 150 | 0,9934 ± 0,0021 | 0,9934 ± 0,0042 | 0,9933 ± 0,0060 | 0,9933 ± 0,0021 | 1,0 / 1,0 | 0,66% | 0,67% | 0,9934 ± 0,0021 |
+
+\* Com 83% de legítimos no teste, a acurácia não é comparável com as demais linhas; usar acurácia balanceada e taxas por classe. Acurácia balanceada = média entre a taxa de acerto dos legítimos e a dos phishing.
+
+**Eficiência computacional (mesmo PC, CPU)**
+
+| Configuração | T. treino bruto (s) | T. treino líquido (s) | T. teste (s) | Detecção (ms) | TES (bruto) | IES | RTDE | Treino × completo |
+|---|---|---|---|---|---|---|---|---|
+| **PHILDER completo** | 392,3 ± 4,4 | 370,1 ± 3,9 | 2,20 ± 0,02 | 7,31 ± 0,08 | 0,00253 ± 0,00002 | 0,452 ± 0,005 | 136,0 ± 1,5 | 1,00× |
+| Sem pré-treino | 424,9 ± 1,9 | 401,9 ± 1,9 | 2,29 ± 0,01 | 7,60 ± 0,05 | 0,00231 ± 0,00001 | 0,428 ± 0,003 | 129,0 ± 0,8 | 1,08× |
+| Sem *undersampling* | 1.159,9 ± 2,7 | 1.095,7 ± 2,9 | 6,45 ± 0,08 | 7,29 ± 0,10 | 0,00086 ± 0,00000 | 0,155 ± 0,002 | 136,8 ± 1,9 | 2,96× |
+| Sem máscara (07/10) | 407,4 ± 17,1 | 384,9 ± 16,8 | 2,29 ± 0,13 | 7,61 ± 0,43 | 0,00244 ± 0,00010 | 0,435 ± 0,025 | 130,9 ± 7,4 | 1,04× |
+
+**Resultados por execução**
+
+| Configuração | Rodada | Acurácia | Precisão | Recall | F1 | FP | FN | Acurácia balanceada | T. treino (s) | T. teste (s) | Detecção (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sem pré-treino | 1 | 0,9767 | 0,9864 | 0,9667 | 0,9764 | 2 | 5 | 0,9767 | 423,0 | 2,27 | 7,53 |
+| Sem pré-treino | 2 | 0,9801 | 0,9932 | 0,9667 | 0,9797 | 1 | 5 | 0,9800 | 423,9 | 2,29 | 7,61 |
+| Sem pré-treino | 3 | 0,9801 | 1,0000 | 0,9600 | 0,9796 | 0 | 6 | 0,9800 | 426,2 | 2,31 | 7,66 |
+| Sem pré-treino | 4 | 0,9834 | 1,0000 | 0,9667 | 0,9831 | 0 | 5 | 0,9833 | 424,3 | 2,28 | 7,56 |
+| Sem pré-treino | 5 | 0,9801 | 1,0000 | 0,9600 | 0,9796 | 0 | 6 | 0,9800 | 428,1 | 2,29 | 7,61 |
+| Sem pré-treino | 6 | 0,9801 | 0,9932 | 0,9667 | 0,9797 | 1 | 5 | 0,9800 | 423,8 | 2,30 | 7,62 |
+| Sem *undersampling* | 1 | 0,9966 | 0,9868 | 0,9933 | 0,9900 | 2 | 1 | 0,9953 | 1.159,8 | 6,59 | 7,45 |
+| Sem *undersampling* | 2 | 0,9977 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 0,9960 | 1.161,5 | 6,39 | 7,22 |
+| Sem *undersampling* | 3 | 0,9977 | 0,9933 | 0,9933 | 0,9933 | 1 | 1 | 0,9960 | 1.160,9 | 6,37 | 7,20 |
+| Sem *undersampling* | 4 | 0,9955 | 0,9803 | 0,9933 | 0,9868 | 3 | 1 | 0,9946 | 1.154,6 | 6,44 | 7,27 |
+| Sem *undersampling* | 5 | 0,9955 | 0,9867 | 0,9867 | 0,9867 | 2 | 2 | 0,9920 | 1.162,2 | 6,51 | 7,35 |
+| Sem *undersampling* | 6 | 0,9977 | 0,9868 | 1,0000 | 0,9934 | 2 | 0 | 0,9986 | 1.160,2 | 6,40 | 7,23 |
+
+### 11.4 Comparação com a Tabela 5 do artigo
+
+A Tabela 5 do artigo é uma imagem no PDF (pág. 10); os valores foram transcritos dela. As métricas de eficiência da Tabela 5 estão normalizadas por um critério não informado, por isso a comparação de eficiência é feita em **valores relativos** (cada configuração ÷ PHILDER completo).
+
+| Configuração | Artigo: acurácia / F1 / TES / IES / RTDE | Replicação: acurácia / F1 |
+|---|---|---|
+| PHILDER (full) | 99,27% / 0,993 / 0,92 / 0,89 / 0,93 | 0,9939 / 0,9939 |
+| w/o undersampling | 96,82% / 0,958 / 0,91 / 0,88 / 0,93 | 0,9968\* / 0,9906 |
+| w/o pretraining | 93,45% / 0,925 / 0,80 / 0,76 / 0,84 | 0,9801 / 0,9797 |
+
+**Valores relativos ao PHILDER completo (artigo / replicação)**
+
+| Configuração | Acurácia | F1 | TES | IES | RTDE |
+|---|---|---|---|---|---|
+| Sem pré-treino | 0,941 / 0,986 | 0,932 / 0,986 | 0,87 / **0,91** | 0,85 / **0,95** | 0,90 / 0,95 |
+| Sem *undersampling* | 0,975 / 1,003* | 0,965 / 0,997 | 0,99 / **0,34** | 0,99 / **0,34** | 1,00 / 1,01 |
+
+\* Acurácia não comparável (teste com 83% de legítimos).
+
+### 11.5 Achados
+
+1. **Pré-treino: mesma direção do artigo, efeito cerca de 4 vezes menor.** Sem pré-treino, a acurácia cai 1,4 p.p. (0,9939 → 0,9801), contra 5,8 p.p. no artigo. A queda está concentrada no **phishing que escapa**: a taxa de FN vai de 0,22% para 3,56% (5 a 6 phishing perdidos em todas as 6 rodadas), enquanto a de FP até cai. O pré-treino é, portanto, o componente que mais pesa na **detecção do phishing**. Hipóteses para o efeito menor que no artigo: o Nazario tem pistas de vocabulário fortes, fáceis de aprender do zero com 702 e-mails; o tokenizer continua sendo o pré-treinado; e o artigo usou outra fonte de phishing (PhishTank).
+2. **Sem pré-treino, o modelo aprende mais devagar e sobreajusta.** Na rodada de teste, a acurácia de avaliação foi 0,76 na época 1 (contra ≈ 0,99 com pré-treino); a perda de treino vai a quase zero enquanto a de avaliação sobe (0,10 → 0,14). No livro do Prince, é o papel do pré-treino e da aprendizagem por transferência (Cap. 9) e do fine-tuning do BERT (Cap. 12).
+3. **Treino ≈ 8% mais lento sem pré-treino, nos dois trabalhos.** Aqui, 425 s contra 392 s. No artigo, a queda do TES (−13%) é maior que a da acurácia (−6%), o que implica treino ≈ 8% mais longo. A arquitetura é a mesma; a causa provável é numérica (pesos aleatórios), não o tamanho do modelo.
+4. ***Undersampling*: a qualidade geral não muda, mas os erros mudam de lado.** A acurácia balanceada fica igual (0,9954 contra 0,9939, dentro da variação). Sem *undersampling*, escapam mais phishing (taxa de FN 0,67% contra 0,22%) — o mesmo *"poorer recall"* descrito no artigo — e menos legítimos são marcados como phishing (taxa de FP 0,25% contra 0,99%): treinado com 83% de legítimos, o modelo pende para essa classe. O F1 menor (0,9906 contra 0,9939) vem em parte da proporção do teste: com 735 legítimos, cada FP pesa mais na precisão.
+5. **O ganho claro do *undersampling* é a eficiência.** O treino sem *undersampling* custa 2,96× mais (1.160 s contra 392 s), e TES e IES caem para 0,34 do completo. A detecção por e-mail (RTDE, 7,3 ms) é igual nas três configurações, porque a arquitetura é a mesma. O IES cai também porque o teste tem 885 e-mails em vez de 301; por isso a comparação justa de inferência é por e-mail (RTDE).
+6. **A máscara de links e e-mails não muda o TinyBERT** (0,9939 contra 0,9934; Seção 10.4): o desempenho não dependia do atalho `jose@monkey.org`.
+7. **Conclusão.** As duas decisões de projeto do PHILDER se confirmam, por motivos diferentes: o **pré-treino** é o que sustenta a detecção do phishing (recall); o ***undersampling*** traz sobretudo **eficiência** (≈ 3× menos treino) e prioriza a detecção do phishing (menos FN), sem mudar a qualidade geral.
+
+### 11.6 Inconsistências da Tabela 5 do artigo
+
+1. **TES em três escalas.** Para o mesmo PHILDER, o TES vale 0,0055 pela fórmula bruta sobre a Tabela 3, 0,0389 na Figura 3 e 0,92 na Tabela 5, sem que a normalização da Tabela 5 seja explicada (Seção 2).
+2. **A Tabela 5 contradiz a Figura 3 do próprio artigo.** A Tabela 5 dá TES quase igual sem *undersampling* (0,91 contra 0,92, razão 0,99), como se treinar com ≈ 3 vezes mais dados não custasse nada. A Figura 3 do artigo dá TinyBERT original 0,0133 contra PHILDER 0,0389 — razão **0,34**. A medição desta replicação deu **exatamente 0,34** (TES e IES): concorda com a Figura 3 e contradiz a Tabela 5.
+3. **Acurácia e F1 incompatíveis no *w/o undersampling*.** Com ≈ 150 phishing num teste de ≈ 900 e-mails, acurácia de 96,82% significa ≈ 29 erros; um F1 de 0,958 da classe phishing permite no máximo ≈ 13 erros. Os dois números não podem vir da mesma avaliação; o F1 provavelmente é uma média *macro* ou *weighted*, o que o artigo não informa. Soma-se aos problemas de granularidade da Tabela 4 (desvio de ± 0,0006 impossível com 301 e-mails no teste).
+4. **Nenhuma métrica por classe.** O artigo não informa recall, precisão ou taxas por classe na ablação, o que impede ver a troca entre FP e FN do item 4 da Seção 11.5.
+
+### 11.7 Status
+
+- **Estudo de ablação concluído** (18 execuções válidas: 6 sem pré-treino, 6 sem *undersampling*; o completo é o lote oficial).
+- Tabelas LaTeX da ablação (desempenho e eficiência, artigo × replicação) no Projeto: `claude/Tabelas_Ablacao_LaTeX.md`.
+- Ablação de sementes (variação de `random_state` e `seed`) e do pré-processamento (stopwords) continuam pendentes (Seção 13.5).
+
+---
+
+## 12. Quadro geral comparativo: PHILDER original × replicação (10/11/2026)
+
+> Reúne num só lugar todos os valores do artigo original (Bispo et al., 2025) e da replicação oficial (lote de 01–02/11/2026, Seção 10; ablação de 06/11/2026, Seção 11). **Artigo:** configuração com *undersampling* — linha (2) da Tabela 3, médias ± desvio da Tabela 4 (3 execuções), Figuras 3–5 e Tabela 5 (valores transcritos das imagens do PDF). **Replicação:** média ± desvio-padrão de 6 execuções, PC local (CPU Intel, 12 *threads*, sem GPU), mesmo protocolo e hiperparâmetros para todos os modelos, teste de 301 e-mails (151 legítimos / 150 *phishing*).
+
+### 12.1 Desempenho preditivo
+
+| Modelo | Acurácia — artigo (Tab. 3) | Acurácia — artigo (Tab. 4, n = 3) | **Acurácia — replicação** | Precisão — artigo | **Precisão — replicação** | Recall — artigo | **Recall — replicação** | F1 — artigo (Tab. 3) | F1 — artigo (Tab. 4, n = 3) | **F1 — replicação** | Erros por execução na replicação (FP / FN) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **TinyBERT (PHILDER)** | 0,9927 | 0,9927 ± 0,0006 | **0,9939 ± 0,0039** | 0,9896 | **0,9902 ± 0,0089** | 0,9960 | **0,9978 ± 0,0034** | 0,9927 | 0,9927 ± 0,0004 | **0,9939 ± 0,0038** | 1,8 (1,5 / 0,3) |
+| DistilBERT | 0,9934 | 0,9934 ± 0,0005 | 0,9906 ± 0,0044 | 0,9866 | 0,9837 ± 0,0106 | 1,0000 | 0,9978 ± 0,0034 | 0,9932 | 0,9932 ± 0,0006 | 0,9906 ± 0,0043 | 2,8 (2,5 / 0,3) |
+| MobileBERT | 0,9904 | 0,9904 ± 0,0004 | 0,9906 ± 0,0033 | 0,9781 | 0,9879 ± 0,0064 | 0,9865 | 0,9933 ± 0,0000 | 0,9823 | 0,9823 ± 0,0003 | 0,9906 ± 0,0032 | 2,8 (1,8 / 1,0) |
+| MiniLM | 0,9889 | 0,9889 ± 0,0007 | 0,9884 ± 0,0028 | 0,9857 | 0,9814 ± 0,0063 | 0,9982 | 0,9956 ± 0,0034 | 0,9919 | 0,9919 ± 0,0005 | 0,9884 ± 0,0027 | 3,5 (2,8 / 0,7) |
+| ALBERT | 0,9834 | 0,9834 ± 0,0008 | 0,9878 ± 0,0054 | 0,9797 | 0,9815 ± 0,0111 | 0,9864 | 0,9944 ± 0,0027 | 0,9831 | 0,9831 ± 0,0007 | 0,9879 ± 0,0053 | 3,7 (2,8 / 0,8) |
+
+**Diferença na acurácia (replicação − artigo):** TinyBERT +0,12 p.p. (≈ +0,4 e-mail em 301); DistilBERT −0,28 (−0,8); MobileBERT +0,02 (+0,1); MiniLM −0,05 (−0,2); ALBERT +0,44 (+1,3). Todas dentro do erro-padrão binomial com 301 e-mails (≈ ±0,5 p.p.).
+
+### 12.2 Tempos
+
+| Modelo | Treino (s) — artigo | **Treino (s) — replicação** | Teste (s) — artigo | **Teste (s) — replicação** | Detecção (ms) — artigo | **Detecção (ms) — replicação** | Treino × TinyBERT (artigo → replicação) | Teste × TinyBERT (artigo → replicação) | Detecção × TinyBERT (artigo → replicação) |
+|---|---|---|---|---|---|---|---|---|---|
+| **TinyBERT (PHILDER)** | 180,52 | **392,3 ± 4,4** | 6,22 | **2,20 ± 0,02** | 12,9811 | **7,31 ± 0,08** | 1,00 → 1,00 | 1,00 → 1,00 | 1,00 → 1,00 |
+| DistilBERT | 111,83 | 1.699,6 ± 7,8 | 4,48 | 16,25 ± 0,36 | 14,8841 | 53,99 ± 1,19 | 0,62 → 4,33 | 0,72 → 7,39 | 1,15 → 7,39 |
+| MobileBERT | 219,45 | 1.466,6 ± 50,7 | 9,76 | 10,86 ± 0,76 | 22,5147 | 36,09 ± 2,52 | 1,22 → 3,74 | 1,57 → 4,94 | 1,73 → 4,94 |
+| MiniLM | 103,52 | 1.430,8 ± 12,7 | 6,21 | 9,10 ± 0,07 | 16,1503 | 30,23 ± 0,23 | 0,57 → 3,65 | 1,00 → 4,14 | 1,24 → 4,14 |
+| ALBERT | 236,81 | 3.085,0 ± 11,1 | 9,09 | 37,40 ± 0,19 | 32,8417 | 124,25 ± 0,64 | 1,31 → 7,86 | 1,46 → 17,00 | 2,53 → 17,00 |
+
+Unidades: treino e teste em **segundos** (tempo total); detecção em **milissegundos** (média por e-mail = tempo de teste ÷ e-mails do teste). Tempo de treino bruto, incluindo a avaliação ao fim de cada época. O artigo não informa o *hardware*: os valores absolutos não são diretamente comparáveis; as colunas "× TinyBERT" comparam a ordem de custo dentro de cada trabalho.
+
+### 12.3 Métricas de eficiência (TES, IES, RTDE)
+
+O artigo apresenta essas métricas em **três formas diferentes**, que não concordam entre si: (a) as fórmulas aplicadas aos tempos da sua própria Tabela 3; (b) os valores das Figuras 3–5; (c) valores normalizados na Tabela 4 (só TES e RTDE, critério de normalização não informado). A replicação usa as fórmulas brutas: TES = acurácia ÷ treino (s); IES = acurácia ÷ teste (s); RTDE = acurácia ÷ detecção (s).
+
+| Modelo | TES — artigo (fórmula sobre Tab. 3) | TES — artigo (Fig. 3) | TES — artigo (Tab. 4, normalizado) | **TES — replicação** | IES — artigo (fórmula sobre Tab. 3) | IES — artigo (Fig. 4) | **IES — replicação** | RTDE — artigo (fórmula sobre Tab. 3) | RTDE — artigo (Fig. 5) | RTDE — artigo (Tab. 4, normalizado) | **RTDE — replicação** |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **TinyBERT (PHILDER)** | 0,00550 | 0,0389 | 0,92 ± 0,01 | **0,00253 ± 0,00002** | 0,1596 | 1,0788 | **0,4519 ± 0,0050** | 76,47 | 324,78 | 0,93 ± 0,01 | **136,02 ± 1,50** |
+| DistilBERT | 0,00888 | 0,0089 | 0,89 ± 0,02 | 0,00058 ± 0,00000 | 0,2217 | 0,2217 | 0,0610 ± 0,0014 | 66,74 | 66,74 | 0,87 ± 0,03 | 18,36 ± 0,42 |
+| MobileBERT | 0,00451 | 0,0098 | 0,86 ± 0,02 | 0,00068 ± 0,00002 | 0,1015 | 0,2306 | 0,0915 ± 0,0057 | 43,99 | 69,45 | 0,85 ± 0,01 | 27,55 ± 1,71 |
+| MiniLM | 0,00955 | 0,0231 | 0,91 ± 0,01 | 0,00069 ± 0,00001 | 0,1592 | 0,6261 | 0,1086 ± 0,0010 | 61,23 | 188,78 | 0,91 ± 0,02 | 32,70 ± 0,30 |
+| ALBERT | 0,00415 | 0,0042 | 0,82 ± 0,02 | 0,00032 ± 0,00000 | 0,1082 | 0,0994 | 0,0264 ± 0,0002 | 29,94 | 29,94 | 0,80 ± 0,02 | 7,95 ± 0,06 |
+
+**Ordem dos modelos pela eficiência (1º → 5º)**
+
+| Métrica | Artigo — fórmula sobre Tab. 3 | Artigo — Figuras 3–5 | Replicação |
+|---|---|---|---|
+| TES | MiniLM, DistilBERT, **TinyBERT**, MobileBERT, ALBERT | **TinyBERT**, MiniLM, MobileBERT, DistilBERT, ALBERT | **TinyBERT**, MiniLM, MobileBERT, DistilBERT, ALBERT |
+| IES | DistilBERT, **TinyBERT**, MiniLM, ALBERT, MobileBERT | **TinyBERT**, MiniLM, MobileBERT, DistilBERT, ALBERT | **TinyBERT**, MiniLM, MobileBERT, DistilBERT, ALBERT |
+| RTDE | **TinyBERT**, DistilBERT, MiniLM, MobileBERT, ALBERT | **TinyBERT**, MiniLM, MobileBERT, DistilBERT, ALBERT | **TinyBERT**, MiniLM, MobileBERT, DistilBERT, ALBERT |
+
+### 12.4 Estudo de ablação (TinyBERT)
+
+| Configuração | Acurácia — artigo (Tab. 5) | **Acurácia — replicação** | F1 — artigo (Tab. 5) | **F1 — replicação** | Precisão / Recall — replicação | Acurácia balanceada — replicação | Treino (s) — replicação | Teste (s) — replicação | Detecção (ms) — replicação | TES relativo (artigo Tab. 5 / replicação) | IES relativo (artigo / replicação) | RTDE relativo (artigo / replicação) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **PHILDER completo** | 99,27% | **0,9939 ± 0,0039** | 0,993 | **0,9939 ± 0,0038** | 0,9902 / 0,9978 | 0,9939 | 392,3 ± 4,4 | 2,20 | 7,31 | 1,00 / 1,00 | 1,00 / 1,00 | 1,00 / 1,00 |
+| Sem pré-treino | 93,45% | 0,9801 ± 0,0021 | 0,925 | 0,9797 ± 0,0021 | 0,9954 / 0,9644 | 0,9800 | 424,9 ± 1,9 | 2,29 | 7,60 | 0,87 / 0,91 | 0,85 / 0,95 | 0,90 / 0,95 |
+| Sem *undersampling* | 96,82% | 0,9968 ± 0,0011\* | 0,958 | 0,9906 ± 0,0033 | 0,9879 / 0,9933 | 0,9954 | 1.159,9 ± 2,7 | 6,45\* | 7,29 | 0,99 / **0,34** | 0,99 / **0,34** | 1,00 / 1,01 |
+
+\* Teste com 885 e-mails (735 legítimos / 150 *phishing*): acurácia e tempo total de teste não comparáveis com as outras linhas; comparar por acurácia balanceada, taxas por classe e detecção por e-mail. Na Tabela 5 do artigo, TES, IES e RTDE são normalizados; por isso a comparação é feita em valores relativos ao PHILDER completo. Valores absolutos de TES, IES e RTDE da replicação: completo 0,00253 / 0,452 / 136,0; sem pré-treino 0,00231 / 0,428 / 129,0; sem *undersampling* 0,00086 / 0,155 / 136,8.
+
+**Mesma configuração, quatro valores no artigo.** O PHILDER sem *undersampling* corresponde ao TinyBERT (1) da Tabela 3 do artigo: acurácia 0,9936, F1 0,9934, treino 212,39 s, teste 7,61 s, detecção 12,9966 ms. Esses valores **não concordam** com a Tabela 5 do próprio artigo (96,82% e 0,958). O TES relativo sem *undersampling* também tem três valores diferentes no artigo: 0,85 pela Tabela 3, 0,34 pela Figura 3 (0,0133 ÷ 0,0389) e 0,99 pela Tabela 5. A replicação mediu **0,34**, igual à Figura 3.
+
+### 12.5 Leitura do quadro
+
+1. **Desempenho preditivo reproduzido.** Os cinco modelos ficam dentro do erro-padrão do artigo (diferenças de acurácia entre −0,8 e +1,3 e-mail em 301); o TinyBERT tem a maior acurácia e o maior F1 da replicação.
+2. **Eficiência: a replicação concorda com as Figuras do artigo, não com a Tabela 3.** Na replicação, a ordem é a mesma nas três métricas (TinyBERT, MiniLM, MobileBERT, DistilBERT, ALBERT) e acompanha o tamanho das arquiteturas — a mesma ordem das Figuras 3–5 do artigo. Já os tempos da Tabela 3 do artigo levam a outra ordem (MiniLM e DistilBERT treinariam mais rápido que o TinyBERT).
+3. **As Figuras 3–5 só batem com a Tabela 3 para DistilBERT e ALBERT.** Para o DistilBERT, TES, IES e RTDE das figuras são exatamente as fórmulas aplicadas aos tempos da Tabela 3; para o ALBERT, TES e RTDE também (o IES da figura é 8% menor). Para TinyBERT, MiniLM e MobileBERT, os valores das figuras são 1,6 a 7 vezes maiores que os das fórmulas (ex.: TES do TinyBERT 0,0389 contra 0,0055). Isso indica que as figuras e a Tabela 3 usaram tempos diferentes para esses três modelos, o que o artigo não explica.
+4. **Tempos absolutos.** O TinyBERT da replicação treina 2,2× mais devagar e testa 2,8× mais rápido que o do artigo; os demais modelos são muito mais lentos aqui do que no artigo (3,7–7,9× o TinyBERT no treino, contra 0,6–1,3× no artigo). Hipóteses: o artigo provavelmente mediu em GPU, onde as diferenças entre modelos pequenos encolhem (Seção 6.4); a replicação mede em CPU, cenário mais próximo do dispositivo de borda a que o PHILDER se destina.
+5. **Ablação:** as duas decisões de projeto se confirmam na replicação, com efeitos menores na acurácia que os do artigo; o ganho do *undersampling* aparece sobretudo no custo de treino (Seção 11.5).
+
+---
+
+## 13. Conclusão e próximos passos
+
+### 13.1 Síntese da trajetória
 
 **Fase 2 (17/09–25/09) — corrigir os dados.** A replicação começou com resultados "bons demais" (precisão 1,0000), que levaram ao diagnóstico de vazamento de dados (duplicatas entre treino e teste). A correção passou por uma solução desenhada mas nunca executada (23/09) e pela descoberta de dois bugs reais de implementação (código morto no Módulo A e rótulos invertidos, 24/09). O lote 25/09(b) foi o primeiro com pipeline verificado linha a linha e sobreposição treino/teste comprovadamente nula (Seções 1.2, 3 e 4).
 
@@ -1380,13 +1584,17 @@ Somando os cinco modelos (média por rodada): FN 9,0 → 3,2; FP 10,2 → 11,5.
 
 **Fase 4 (01/11–02/11) — completar o pré-processamento do artigo.** A inspeção da saída real do Módulo B mostrou que o endereço da caixa-isca do Nazario (`jose@monkey.org`) virava palavras soltas em ≈ 40% dos phishing — um atalho para o modelo —, porque os endereços de e-mail não eram mascarados, ao contrário do artigo (Seção 1.5). As máscaras de links e e-mails foram completadas e verificadas nos dois corpora, e o lote de 5 modelos × 6 execuções foi refeito (Seção 10), tornando-se o resultado oficial.
 
-### 11.2 Resultado de referência atual
+**Fase 5 (06/11) — estudo de ablação.** Com o mesmo protocolo e PC, foram retirados do PHILDER, um por vez, o pré-treino e o *undersampling* (Tabela 5 do artigo), 6 execuções de cada (Seção 11).
+
+### 13.2 Resultado de referência atual
 
 **Lote oficial de 01–02/11/2026 (Seção 10), adotado em 02/11/2026.** Com o pré-processamento completo do artigo (máscaras de links e e-mails), o TinyBERT (PHILDER) tem Acurácia 0,9939 ± 0,0039 e F1 0,9939 ± 0,0038, contra 0,9927 ± 0,0006 no artigo (+0,12 p.p., ≈ 0,4 e-mail em 301) — o desempenho preditivo do PHILDER está reproduzido. É o modelo mais preciso dos cinco e o mais eficiente em todas as medidas: treino 3,7–7,9× mais rápido e teste 4,1–17,0× mais rápido que os demais, no mesmo hardware. A afirmação central do artigo — o TinyBERT oferece o melhor equilíbrio entre acurácia e custo — se sustenta. Os cinco modelos ficam a no máximo 1,3 e-mail das médias do artigo (Seção 10.5), mais perto do que em 07/10. Em grupos: TinyBERT > DistilBERT ≈ MobileBERT > MiniLM ≈ ALBERT (Seção 10.6). A ablação com o lote de 07/10 mostra que o TinyBERT não dependia do atalho `jose@monkey.org` e que as máscaras reduzem os falsos negativos em todos os modelos (Seção 10.4).
 
+**Estudo de ablação (Seção 11).** As duas decisões de projeto do PHILDER se confirmam: sem pré-treino, a acurácia cai para 0,9801 ± 0,0021 e o modelo deixa escapar 5–6 phishing em 150 em todas as rodadas; sem *undersampling*, a qualidade geral fica igual (acurácia balanceada 0,9954), mas escapam mais phishing e o treino custa ≈ 3× mais. As quedas são menores que as da Tabela 5 do artigo, e a Tabela 5 contradiz a Figura 3 do próprio artigo no custo de treino sem *undersampling*.
+
 **Registro histórico — referência de 07/10 a 01/11.** Lote final de 07/10 (Seção 8), sem a máscara de endereços de e-mail: TinyBERT (PHILDER) com Acurácia 0,9934 ± 0,0021 e F1 0,9933 ± 0,0021, contra 0,9927 ± 0,0006 no artigo — o desempenho preditivo do PHILDER foi reproduzido. O TinyBERT empata com o DistilBERT (0,9928 ± 0,0014), o modelo mais preciso, e é o mais eficiente em todas as medidas: 3,9–7,8× mais rápido no treino e 4,2–17,1× na inferência que os demais modelos, no mesmo hardware. A afirmação central do artigo — o TinyBERT oferece o melhor equilíbrio entre acurácia e custo — se sustenta, e com margem maior que a sugerida pela Tabela 3 do próprio artigo. As diferenças em relação ao artigo (MiniLM e MobileBERT abaixo; tempos de treino maiores e de inferência menores) estão registradas na Seção 5.3. As execuções complementares de 09/10 (Seção 9) confirmam a separação em três grupos e mostram que a ordem entre ALBERT e MiniLM não é estável; o ALBERT com os hiperparâmetros do próprio artigo treinou de forma estável, mas sem ganho de acurácia numa rodada.
 
-### 11.3 Lições metodológicas
+### 13.3 Lições metodológicas
 
 1. **Plausibilidade das métricas não substitui verificação direta** do código executado e dos dados resultantes (vazamento de dados e código morto, Seção 1.2).
 2. **Usar o teste para decidir o treino infla o resultado,** mesmo sem nenhum e-mail do teste nos pesos (viés de seleção, ≈ 0,4 p.p.; Seção 3.4).
@@ -1398,8 +1606,9 @@ Somando os cinco modelos (média por rodada): FN 9,0 → 3,2; FP 10,2 → 11,5.
 8. **Duplicatas podem ser invisíveis no texto bruto:** todas as 80 duplicatas descartadas nos dois corpora só aparecem depois do pré-processamento (Seção 1.4); a comparação deve usar o mesmo texto que o modelo recebe.
 9. **Conferir cada etapa do pré-processamento contra a descrição do artigo, na saída real:** a falta da máscara de endereços de e-mail só apareceu ao ler um `body_processado` (Seção 1.5). Endereços, domínios e nomes ligados à fonte de coleta criam atalhos que o teste da mesma distribuição não revela.
 10. **Corrigir um atalho e manter o resultado é evidência, não decepção:** com as máscaras, a acurácia do TinyBERT ficou igual e a dos outros modelos subiu ou caiu menos de 1 e-mail (Seção 10.4). Isso mostra que o desempenho vinha do conteúdo das mensagens, não do endereço da caixa-isca. A comparação só é possível porque o lote antigo foi mantido como condição de ablação.
+11. **Quando a proporção das classes no teste muda, acurácia, precisão e F1 deixam de ser comparáveis:** no estudo de ablação, o teste sem *undersampling* tem 83% de legítimos, e só as taxas de erro por classe e a acurácia balanceada mostraram que a qualidade geral não mudou — o que mudou foi o tipo de erro (Seção 11.5).
 
-### 11.4 Registro histórico — conclusão de 25/09
+### 13.4 Registro histórico — conclusão de 25/09
 
 Conclusão registrada ao fim da Fase 2, mantida para registro. O resultado de referência nela citado (25/09(b)) foi substituído (Seção 1.3).
 
@@ -1410,9 +1619,9 @@ Itens em aberto para próximas atualizações deste documento:
 - Incorporar novos marcos à linha do tempo conforme forem executados.
 - A extensão da deduplicação prévia ao lado do SpamAssassin (item que estava em aberto neste documento até a atualização anterior) já foi implementada e validada como parte da correção de 24–25/09 — item concluído, com os dois lotes (a) e (b) documentando o antes/depois dessa extensão.
 
-> **Situação em 08/10:** o primeiro item (sementes) teve decisão — manter o split e as sementes fixos no protocolo principal e avaliar a variação de sementes no estudo de ablação (Seção 11.5). O segundo é atendido continuamente por este documento. O terceiro já estava concluído.
+> **Situação em 08/10:** o primeiro item (sementes) teve decisão — manter o split e as sementes fixos no protocolo principal e avaliar a variação de sementes no estudo de ablação (Seção 13.5). O segundo é atendido continuamente por este documento. O terceiro já estava concluído.
 
-### 11.5 Pendências consolidadas (08/10/2026; atualizado em 02/11)
+### 13.5 Pendências consolidadas (08/10/2026; atualizado em 07/11)
 
 **Lote com máscaras de links e e-mails (01–02/11/2026; Seções 1.5 e 10)**
 - ~~Executar o lote 5 modelos × 6 execuções com as máscaras e confirmar os novos hashes.~~ **Concluído em 02/11** (Seção 10; hashes confirmados nas 30 execuções).
@@ -1428,9 +1637,10 @@ Itens em aberto para próximas atualizações deste documento:
 - Investigar o padrão "treino mais lento, inferência mais rápida" em relação ao artigo (comprimento de sequência, batch de inferência, tokenização dentro do tempo de teste; Seções 3.4 e 5.3).
 
 **Experimentos complementares (separados do protocolo principal)**
+- ~~Estudo de ablação do artigo (sem pré-treino e sem *undersampling*, Tabela 5).~~ **Concluído em 06/11** (Seção 11). Ideia em aberto, além do artigo: treinar com mais phishing (o Nazario tem 1.471 únicos), balanceado 1.471 / 1.471 ou 2.446 / 1.471, para medir o efeito do tamanho da base.
 - Estudo de ablação com variação de sementes (`random_state` do split e `seed` do treino).
-- Warmup / learning rate menor para o ALBERT, sem usar o teste para escolher a configuração do protocolo principal (Seção 7.10). Ponto de partida documentado: Tabela 14 do artigo do ALBERT (Seção 11.6). *1ª rodada feita em 09/10 (Seção 9.3): treino estável, acurácia 0,9734.* Faltam ao menos mais 2 rodadas com a mesma configuração.
-- Fine-tuning com os hiperparâmetros recomendados por modelo (faixas da Seção 11.6), escolhidos num conjunto de **validação separado do treino** e medidos no teste uma única vez — inclusive menos épocas para o MiniLM (3–5) e batch 16–32 para todos.
+- Warmup / learning rate menor para o ALBERT, sem usar o teste para escolher a configuração do protocolo principal (Seção 7.10). Ponto de partida documentado: Tabela 14 do artigo do ALBERT (Seção 13.6). *1ª rodada feita em 09/10 (Seção 9.3): treino estável, acurácia 0,9734.* Faltam ao menos mais 2 rodadas com a mesma configuração.
+- Fine-tuning com os hiperparâmetros recomendados por modelo (faixas da Seção 13.6), escolhidos num conjunto de **validação separado do treino** e medidos no teste uma única vez — inclusive menos épocas para o MiniLM (3–5) e batch 16–32 para todos.
 - Experimento GPU vs. CPU, para testar a hipótese de compressão das diferenças de tempo em hardware potente (Seções 6.4 e 7.9).
 - Checagem de **quase-duplicatas** entre treino e teste (similaridade de texto, ex.: proporção de palavras em comum acima de 90%), motivada pelas campanhas repetidas do Nazario (Seção 1.4.4, item 5).
 - Estudo de ablação do pré-processamento: treinar **com e sem remoção de stopwords** (a remoção apaga negações; Seção 1.4.4, item 3) e avaliar o tratamento de letras acentuadas.
@@ -1447,9 +1657,9 @@ Itens em aberto para próximas atualizações deste documento:
 - Mover `resultados/tinybert/resultado_final-7_07102026.csv` (cópia do lote de validação 501/501) para `resultados/tinybert/teste e validacao/`; decidir se o CSV da validação 502/501 (Seção 8.4) deve ser recuperado de `.ipynb_checkpoints`.
 - Atualizar `Embasamento_Teorico_Metricas_PHILDER.md` (versão de 25/09) e o handoff do projeto com a referência atual.
 - Remover cópias duplicadas deste documento no Projeto.
-- Iniciar a redação do artigo (Overleaf, formato IEEE) a partir das Seções 5, 8, 9, 10 e 11, apresentando a comparação entre modelos **por grupos** (Seção 9.2).
+- Iniciar a redação do artigo (Overleaf, formato IEEE) a partir das Seções 10, 11, 12 e 13 (quadro geral na Seção 12), apresentando a comparação entre modelos **por grupos** (Seção 9.2).
 
-### 11.6 Hiperparâmetros recomendados pelos autores dos modelos (levantamento de 09/10/2026)
+### 13.6 Hiperparâmetros recomendados pelos autores dos modelos (levantamento de 09/10/2026)
 
 **Motivação.** O protocolo deste trabalho usa os mesmos hiperparâmetros para os cinco modelos (lr 5e-5, batch 8, 10 épocas, `weight_decay=0.01`, `max_length=128`, sem warmup), por fidelidade ao PHILDER e para evitar viés de seleção no teste (Seção 3.4). Para avaliar se essa escolha prejudica algum modelo, foram consultados os model cards dos checkpoints no Hugging Face e os artigos originais de cada arquitetura.
 
@@ -1477,11 +1687,11 @@ Itens em aberto para próximas atualizações deste documento:
 
 **Leitura.**
 
-1. **ALBERT:** o artigo usa learning rate 5× menor (1e-5) e warmup de ≈ 6% na tarefa mais parecida com a nossa. O protocolo deste trabalho (5e-5, sem warmup) fica fora dessa faixa, o que é coerente com o platô em ln 2 e com a instabilidade observada (Seções 6.4, 7.8 e 8.9). Dá base documentada ao experimento com warmup previsto na Seção 11.5.
+1. **ALBERT:** o artigo usa learning rate 5× menor (1e-5) e warmup de ≈ 6% na tarefa mais parecida com a nossa. O protocolo deste trabalho (5e-5, sem warmup) fica fora dessa faixa, o que é coerente com o platô em ln 2 e com a instabilidade observada (Seções 6.4, 7.8 e 8.9). Dá base documentada ao experimento com warmup previsto na Seção 13.5.
 2. **MiniLM:** o artigo recomenda 3 a 5 épocas; aqui são 10, o que é coerente com o sobreajuste observado (perda de avaliação mínima na 2ª época; Seção 8.9).
 3. **MobileBERT:** 10 épocas e 5e-5 estão dentro da faixa do próprio artigo, coerente com o desempenho estável do modelo.
 4. **TinyBERT:** o artigo não prevê fine-tuning direto do checkpoint geral — o procedimento original é a destilação específica de tarefa com o BERT como professor. Este trabalho (como, aparentemente, o PHILDER) faz fine-tuning direto. É uma diferença em relação ao TinyBERT original a ser registrada no artigo; ainda assim o modelo atinge o melhor resultado.
 5. **Batch 8:** menor que o recomendado em todos os artigos (16 a 48).
-6. **Consequência para a comparação:** o protocolo único, fiel ao PHILDER, pode desfavorecer o ALBERT e o MiniLM. Isso não altera a conclusão central (o TinyBERT, sob o mesmo protocolo, empata com o melhor modelo e é o mais eficiente), mas deve constar como **limitação** no artigo. Ajustar hiperparâmetros por modelo só é válido com um conjunto de validação separado do treino (Seção 11.5).
+6. **Consequência para a comparação:** o protocolo único, fiel ao PHILDER, pode desfavorecer o ALBERT e o MiniLM. Isso não altera a conclusão central (o TinyBERT, sob o mesmo protocolo, empata com o melhor modelo e é o mais eficiente), mas deve constar como **limitação** no artigo. Ajustar hiperparâmetros por modelo só é válido com um conjunto de validação separado do treino (Seção 13.5).
 
 Fontes: model cards [43]–[47] e artigos [22], [24]–[28] da `bibliografia.md` (seção "Documentação dos checkpoints e hiperparâmetros de fine-tuning").
