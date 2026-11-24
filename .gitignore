@@ -16,8 +16,13 @@ Thumbs.db
 # Documentos de trabalho (não publicados no repositório)
 Analise_dos_Resultados.md
 Embasamento_Teorico_Metricas_PHILDER.md
+
 Guia_Fase2_*.md
 Relatorio_*.md
 Relatorio_*.pdf
 Relatório*.md
 Relatório*.pdf
+philder-full.ipynb
+
+# Arquivos de trabalho gerados nas sessões com o Claude
+resultados/Claude outputs/
